@@ -1069,16 +1069,20 @@ func (k *KubernetesUtils) validateOnePort(allPods []Pod, reachability *Reachabil
 	numProbes := len(allPods) * len(allPods)
 	resultsCh := make(chan *probeResult, numProbes)
 	// TODO: find better metrics, this is only for POC.
-	oneProbe := func(podFrom, podTo Pod, port int32) {
+	oneProbe := func(podFrom, podTo Pod, port int32, probeBatch *sync.WaitGroup) {
+		defer probeBatch.Done()
 		log.Tracef("Probing: %s -> %s", podFrom, podTo)
 		expectedResult := reachability.Expected.Get(podFrom.String(), podTo.String())
 		connectivity, err := k.Probe(podFrom.Namespace(), podFrom.PodName(), podTo.Namespace(), podTo.PodName(), port, protocol, nil, &expectedResult)
 		resultsCh <- &probeResult{podFrom, podTo, connectivity, err}
 	}
 	for _, pod1 := range allPods {
+		var probeBatch sync.WaitGroup
 		for _, pod2 := range allPods {
-			go oneProbe(pod1, pod2, port)
+			probeBatch.Add(1)
+			go oneProbe(pod1, pod2, port, &probeBatch)
 		}
+		probeBatch.Wait()
 	}
 	for i := 0; i < numProbes; i++ {
 		r := <-resultsCh
