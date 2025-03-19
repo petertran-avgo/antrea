@@ -1037,22 +1037,18 @@ func (k *KubernetesUtils) waitForHTTPServers(allPods []Pod) error {
 	log.Infof("waiting for HTTP servers (ports 80, 81 and 8080:8085) to become ready")
 
 	serversAreReady := func() bool {
-		reachability := NewReachability(allPods, Connected)
-		k.Validate(allPods, reachability, []int32{80, 81, 8080, 8081, 8082, 8083, 8084, 8085}, utils.ProtocolTCP)
-		if _, wrong, _ := reachability.Summary(); wrong != 0 {
-			return false
+
+		podReachability := podReachability{
+			pods:            allPods,
+			KubernetesUtils: k,
+			protocolPortPairs: map[utils.AntreaPolicyProtocol][]int32{
+				utils.ProtocolTCP:  []int32{80, 81, 8080, 8081, 8082, 8083, 8084, 8085},
+				utils.ProtocolUDP:  []int32{80, 81},
+				utils.ProtocolSCTP: []int32{80, 81},
+			},
 		}
 
-		k.Validate(allPods, reachability, []int32{80, 81}, utils.ProtocolUDP)
-		if _, wrong, _ := reachability.Summary(); wrong != 0 {
-			return false
-		}
-
-		k.Validate(allPods, reachability, []int32{80, 81}, utils.ProtocolSCTP)
-		if _, wrong, _ := reachability.Summary(); wrong != 0 {
-			return false
-		}
-		return true
+		return podReachability.isReachable()
 	}
 
 	for i := 0; i < maxTries; i++ {
@@ -1104,6 +1100,40 @@ func (k *KubernetesUtils) validateOnePort(allPods []Pod, reachability *Reachabil
 			reachability.Observe(r.podFrom, r.podTo, Error)
 		}
 	}
+}
+
+type podReachability struct {
+	*KubernetesUtils
+	pods              []Pod
+	reachability      *Reachability
+	isRemote          bool
+	protocolPortPairs map[utils.AntreaPolicyProtocol][]int32
+}
+
+func (pr *podReachability) isReachable() bool {
+	pr.reachability = NewReachability(pr.pods, Connected)
+	for protocol, ports := range pr.protocolPortPairs {
+		if !pr.Validate(ports, protocol) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (pr *podReachability) Validate(ports []int32, protocol utils.AntreaPolicyProtocol) bool {
+	for _, port := range ports {
+		// we do not run all the probes in parallel as we have experienced that on some
+		// machines, this can cause a fraction of the probes to always fail, despite the
+		// built-in retry (3x) mechanism. Probably because of the large number of probes,
+		// each one being executed in its own goroutine. For example, with 9 Pods and for
+		// ports 80, 81, 8080, 8081, 8082, 8083, 8084 and 8085, we would end up with
+		// potentially 9*9*8 = 648 simultaneous probes.
+		pr.validateOnePort(pr.pods, pr.reachability, port, protocol)
+	}
+	_, wrong, _ := pr.reachability.Summary()
+
+	return wrong != 0
 }
 
 // Validate checks the connectivity between all Pods in both directions with a
