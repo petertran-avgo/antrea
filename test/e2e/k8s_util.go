@@ -1065,11 +1065,15 @@ func (k *KubernetesUtils) waitForHTTPServers(allPods []Pod) error {
 	return fmt.Errorf("after %d tries, HTTP servers are not ready", maxTries)
 }
 
-func (k *KubernetesUtils) validateOnePort(allPods []Pod, reachability *Reachability, port int32, protocol utils.AntreaPolicyProtocol) {
+// Validate checks the connectivity between all Pods in both directions with a
+// list of ports and a protocol. The connectivity from a Pod to another Pod should
+// be consistent across all provided ports. Otherwise, this connectivity will be
+// treated as Error.
+func (k *KubernetesUtils) Validate(allPods []Pod, reachability *Reachability, ports []int32, protocol utils.AntreaPolicyProtocol) {
 	podCount := len(allPods)
-	numProbes := podCount * podCount
-	resultsCh := make(chan *probeResult, numProbes)
+	numProbes := podCount * podCount * len(ports)
 	// TODO: find better metrics, this is only for POC.
+	resultsCh := make(chan *probeResult, numProbes)
 	oneProbe := func(podFrom, podTo Pod, port int32, sem chan int) {
 		log.Tracef("Probing: %s -> %s", podFrom, podTo)
 		expectedResult := reachability.Expected.Get(podFrom.String(), podTo.String())
@@ -1077,11 +1081,13 @@ func (k *KubernetesUtils) validateOnePort(allPods []Pod, reachability *Reachabil
 		resultsCh <- &probeResult{podFrom, podTo, connectivity, err}
 		<-sem
 	}
-	var sem = make(chan int, 150)
-	for _, pod1 := range allPods {
-		for _, pod2 := range allPods {
-			sem <- 1
-			go oneProbe(pod1, pod2, port, sem)
+	var sem = make(chan int, 100)
+	for _, port := range ports {
+		for _, pod1 := range allPods {
+			for _, pod2 := range allPods {
+				sem <- 1
+				go oneProbe(pod1, pod2, port, sem)
+			}
 		}
 	}
 	for i := 0; i < numProbes; i++ {
@@ -1103,22 +1109,6 @@ func (k *KubernetesUtils) validateOnePort(allPods []Pod, reachability *Reachabil
 		} else if prevConn != r.connectivity {
 			reachability.Observe(r.podFrom, r.podTo, Error)
 		}
-	}
-}
-
-// Validate checks the connectivity between all Pods in both directions with a
-// list of ports and a protocol. The connectivity from a Pod to another Pod should
-// be consistent across all provided ports. Otherwise, this connectivity will be
-// treated as Error.
-func (k *KubernetesUtils) Validate(allPods []Pod, reachability *Reachability, ports []int32, protocol utils.AntreaPolicyProtocol) {
-	for _, port := range ports {
-		// we do not run all the probes in parallel as we have experienced that on some
-		// machines, this can cause a fraction of the probes to always fail, despite the
-		// built-in retry (3x) mechanism. Probably because of the large number of probes,
-		// each one being executed in its own goroutine. For example, with 9 Pods and for
-		// ports 80, 81, 8080, 8081, 8082, 8083, 8084 and 8085, we would end up with
-		// potentially 9*9*8 = 648 simultaneous probes.
-		k.validateOnePort(allPods, reachability, port, protocol)
 	}
 }
 
