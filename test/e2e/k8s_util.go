@@ -1065,26 +1065,23 @@ func (k *KubernetesUtils) waitForHTTPServers(allPods []Pod) error {
 	return fmt.Errorf("after %d tries, HTTP servers are not ready", maxTries)
 }
 
-func (k *KubernetesUtils) validateOnePort(allPods []Pod, reachability *Reachability, port int32, protocol utils.AntreaPolicyProtocol, probeBatching bool) {
+func (k *KubernetesUtils) validateOnePort(allPods []Pod, reachability *Reachability, port int32, protocol utils.AntreaPolicyProtocol) {
 	podCount := len(allPods)
 	numProbes := podCount * podCount
 	resultsCh := make(chan *probeResult, numProbes)
 	// TODO: find better metrics, this is only for POC.
-	oneProbe := func(podFrom, podTo Pod, port int32, probeBatch *sync.WaitGroup) {
-		defer probeBatch.Done()
+	oneProbe := func(podFrom, podTo Pod, port int32, sem chan int) {
 		log.Tracef("Probing: %s -> %s", podFrom, podTo)
 		expectedResult := reachability.Expected.Get(podFrom.String(), podTo.String())
 		connectivity, err := k.Probe(podFrom.Namespace(), podFrom.PodName(), podTo.Namespace(), podTo.PodName(), port, protocol, nil, &expectedResult)
 		resultsCh <- &probeResult{podFrom, podTo, connectivity, err}
+		<-sem
 	}
+	var sem = make(chan int, 150)
 	for _, pod1 := range allPods {
-		var probeBatch sync.WaitGroup
 		for _, pod2 := range allPods {
-			probeBatch.Add(1)
-			go oneProbe(pod1, pod2, port, &probeBatch)
-		}
-		if probeBatching {
-			probeBatch.Wait()
+			sem <- 1
+			go oneProbe(pod1, pod2, port, sem)
 		}
 	}
 	for i := 0; i < numProbes; i++ {
@@ -1114,12 +1111,6 @@ func (k *KubernetesUtils) validateOnePort(allPods []Pod, reachability *Reachabil
 // be consistent across all provided ports. Otherwise, this connectivity will be
 // treated as Error.
 func (k *KubernetesUtils) Validate(allPods []Pod, reachability *Reachability, ports []int32, protocol utils.AntreaPolicyProtocol) {
-	podCount := len(allPods)
-	numProbes := podCount * podCount
-	probeBatching := numProbes >= 225
-	if probeBatching {
-		log.Infof("Probing required %v times. Probing is rate limited to batches of %v", numProbes, podCount)
-	}
 	for _, port := range ports {
 		// we do not run all the probes in parallel as we have experienced that on some
 		// machines, this can cause a fraction of the probes to always fail, despite the
@@ -1127,7 +1118,7 @@ func (k *KubernetesUtils) Validate(allPods []Pod, reachability *Reachability, po
 		// each one being executed in its own goroutine. For example, with 9 Pods and for
 		// ports 80, 81, 8080, 8081, 8082, 8083, 8084 and 8085, we would end up with
 		// potentially 9*9*8 = 648 simultaneous probes.
-		k.validateOnePort(allPods, reachability, port, protocol, probeBatching)
+		k.validateOnePort(allPods, reachability, port, protocol)
 	}
 }
 
