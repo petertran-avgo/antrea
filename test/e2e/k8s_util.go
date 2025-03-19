@@ -18,6 +18,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -1074,21 +1076,24 @@ func (k *KubernetesUtils) Validate(allPods []Pod, reachability *Reachability, po
 	numProbes := podCount * podCount * len(ports)
 	// TODO: find better metrics, this is only for POC.
 	resultsCh := make(chan *probeResult, numProbes)
-	oneProbe := func(podFrom, podTo Pod, port int32, sem chan int) {
-		log.Tracef("Probing: %s -> %s", podFrom, podTo)
-		expectedResult := reachability.Expected.Get(podFrom.String(), podTo.String())
-		connectivity, err := k.Probe(podFrom.Namespace(), podFrom.PodName(), podTo.Namespace(), podTo.PodName(), port, protocol, nil, &expectedResult)
-		resultsCh <- &probeResult{podFrom, podTo, connectivity, err}
-		<-sem
-	}
-	var sem = make(chan int, 100)
-	for _, port := range ports {
-		for _, pod1 := range allPods {
-			for _, pod2 := range allPods {
-				sem <- 1
-				go oneProbe(pod1, pod2, port, sem)
+	oneProbe := func(podFrom Pod, allPods []Pod, port []int32) {
+		allPods = slices.Clone(allPods)
+		rand.Shuffle(len(allPods), func(i, j int) {
+			allPods[i], allPods[j] = allPods[j], allPods[i]
+		})
+
+		for _, podTo := range allPods {
+			for _, port := range ports {
+				log.Tracef("Probing: %s -> %s", podFrom, podTo)
+				expectedResult := reachability.Expected.Get(podFrom.String(), podTo.String())
+				connectivity, err := k.Probe(podFrom.Namespace(), podFrom.PodName(), podTo.Namespace(), podTo.PodName(), port, protocol, nil, &expectedResult)
+				resultsCh <- &probeResult{podFrom, podTo, connectivity, err}
 			}
 		}
+	}
+
+	for _, fromPod := range allPods {
+		go oneProbe(fromPod, allPods, ports)
 	}
 	for i := 0; i < numProbes; i++ {
 		r := <-resultsCh
