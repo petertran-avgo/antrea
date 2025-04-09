@@ -137,7 +137,7 @@ func (p *antreaClientProvider) GetAntreaClient() (versioned.Interface, error) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 	if p.client == nil {
-		return nil, fmt.Errorf("Antrea client is not ready")
+		return nil, fmt.Errorf("antrea client is not ready")
 	}
 	return p.client, nil
 }

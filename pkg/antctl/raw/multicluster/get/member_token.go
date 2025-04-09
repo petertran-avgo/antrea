@@ -53,7 +53,7 @@ var tokenExamples = strings.Trim(`
 
 func (o *tokenOptions) validateAndComplete(cmd *cobra.Command) error {
 	if o.namespace == "" && !o.allNamespaces {
-		return fmt.Errorf("Namespace must be specified")
+		return fmt.Errorf("namespace must be specified")
 	}
 	if o.allNamespaces {
 		o.namespace = metav1.NamespaceAll

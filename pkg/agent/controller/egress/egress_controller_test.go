@@ -92,7 +92,6 @@ func (d *fakeLocalIPDetector) Run(stopCh <-chan struct{}) {
 }
 
 func (d *fakeLocalIPDetector) AddEventHandler(handler ipassigner.LocalIPEventHandler) {
-	return
 }
 
 func (d *fakeLocalIPDetector) HasSynced() bool {
@@ -1260,7 +1259,7 @@ func TestExternalIPPoolUpdateShouldSyncEgress(t *testing.T) {
 			return c.queue.Len() == len(items)
 		}, time.Second, 10*time.Millisecond)
 		expectedItems := sets.New[string](items...)
-		for i := 0; i < len(items); i++ {
+		for range items {
 			item, _ := c.queue.Get()
 			c.queue.Done(item)
 			expectedItems.Delete(item)

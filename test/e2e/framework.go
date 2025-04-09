@@ -72,7 +72,7 @@ import (
 var AntreaConfigMap *corev1.ConfigMap
 
 var (
-	connectionLostError = fmt.Errorf("http2: client connection lost")
+	errConnectionLost = fmt.Errorf("http2: client connection lost")
 )
 
 const (
@@ -791,7 +791,7 @@ func (data *TestData) collectPodCIDRs() error {
 		}
 		clusterNode := getNodeByName(node.Name)
 		if clusterNode == nil {
-			return fmt.Errorf("Node %s not found in ClusterInfo", node.Name)
+			return fmt.Errorf("node %s not found in ClusterInfo", node.Name)
 		}
 		clusterNode.podV4NetworkCIDR = podV4NetworkCIDR
 		clusterNode.podV6NetworkCIDR = podV6NetworkCIDR
@@ -2227,7 +2227,7 @@ func (data *TestData) deleteServiceAndWait(timeout time.Duration, name, namespac
 		return false, nil
 	})
 	if wait.Interrupted(err) {
-		return fmt.Errorf("Service '%s' still visible to client after %v", name, timeout)
+		return fmt.Errorf("service '%s' still visible to client after %v", name, timeout)
 	}
 	return err
 }
@@ -2345,17 +2345,17 @@ func parseArpingStdout(out string) (sent uint32, received uint32, loss float32, 
 	re := regexp.MustCompile(`(\d+)\s+packets\s+transmitted,\s+(\d+)\s+packets\s+received,\s+(\d+)%\s+unanswered`)
 	matches := re.FindStringSubmatch(out)
 	if len(matches) == 0 {
-		return 0, 0, 0.0, fmt.Errorf("Unexpected arping output")
+		return 0, 0, 0.0, fmt.Errorf("unexpected arping output")
 	}
 	v, err := strconv.ParseUint(matches[1], 10, 32)
 	if err != nil {
-		return 0, 0, 0.0, fmt.Errorf("Error when retrieving 'packets transmitted' from arpping output: %v", err)
+		return 0, 0, 0.0, fmt.Errorf("error when retrieving 'packets transmitted' from arpping output: %v", err)
 	}
 	sent = uint32(v)
 
 	v, err = strconv.ParseUint(matches[2], 10, 32)
 	if err != nil {
-		return 0, 0, 0.0, fmt.Errorf("Error when retrieving 'packets received' from arpping output: %v", err)
+		return 0, 0, 0.0, fmt.Errorf("error when retrieving 'packets received' from arpping output: %v", err)
 	}
 	received = uint32(v)
 	loss = 100. * float32(sent-received) / float32(sent)
@@ -3176,7 +3176,7 @@ func (data *TestData) waitForStatefulSetPods(timeout time.Duration, stsName stri
 }
 
 func isConnectionLostError(err error) bool {
-	return strings.Contains(err.Error(), connectionLostError.Error())
+	return strings.Contains(err.Error(), errConnectionLost.Error())
 }
 
 // retryOnConnectionLostError allows the caller to retry fn in case the error is ConnectionLost.

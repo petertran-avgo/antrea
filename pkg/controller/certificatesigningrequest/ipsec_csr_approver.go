@@ -149,11 +149,11 @@ func (ic *ipsecCSRApprover) verifyIdentity(nodeName string, csr *certificatesv1.
 	}
 	pod, err := ic.client.CoreV1().Pods(env.GetAntreaNamespace()).Get(context.TODO(), podName, metav1.GetOptions{})
 	if err != nil && apierrors.IsNotFound(err) {
-		return fmt.Errorf("Pod %s not found", podName)
+		return fmt.Errorf("pod %s not found", podName)
 	} else if err != nil {
 		return &transientError{err}
 	}
-	if pod.ObjectMeta.UID != types.UID(podUID) {
+	if pod.UID != types.UID(podUID) {
 		return errPodUIDMismatch
 	}
 	if pod.Spec.NodeName != nodeName {

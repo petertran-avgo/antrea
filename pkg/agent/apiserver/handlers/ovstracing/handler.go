@@ -70,10 +70,10 @@ func getServiceClusterIP(aq querier.AgentQuerier, name, namespace string) (net.I
 	srv, err := aq.GetK8sClient().CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
-			return nil, handlers.NewHandlerError(errors.New("Service not found"), http.StatusNotFound)
+			return nil, handlers.NewHandlerError(errors.New("service not found"), http.StatusNotFound)
 		}
 		klog.ErrorS(err, "Failed to get Service from Kubernetes API")
-		return nil, handlers.NewHandlerError(errors.New("Kubernetes API error"), http.StatusInternalServerError)
+		return nil, handlers.NewHandlerError(errors.New("kubernetes API error"), http.StatusInternalServerError)
 	}
 	return net.ParseIP(srv.Spec.ClusterIP).To4(), nil
 }
@@ -120,11 +120,11 @@ func getPeerAddress(aq querier.AgentQuerier, peer *tracingPeer, addrFamily uint8
 	pod, err := aq.GetK8sClient().CoreV1().Pods(peer.namespace).Get(context.TODO(), peer.name, metav1.GetOptions{})
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
-			err := handlers.NewHandlerError(fmt.Errorf("Pod %s/%s not found", peer.namespace, peer.name), http.StatusNotFound)
+			err := handlers.NewHandlerError(fmt.Errorf("pod %s/%s not found", peer.namespace, peer.name), http.StatusNotFound)
 			return nil, nil, err
 		}
 		klog.ErrorS(err, "Failed to get Pod from Kubernetes API")
-		return nil, nil, handlers.NewHandlerError(errors.New("Kubernetes API error"), http.StatusInternalServerError)
+		return nil, nil, handlers.NewHandlerError(errors.New("kubernetes API error"), http.StatusInternalServerError)
 	}
 	// Return IP only assuming it should be a remote Pod.
 	podIP, err := getPodIPWithAddressFamily(pod, addrFamily)

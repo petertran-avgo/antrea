@@ -48,7 +48,7 @@ func (o *leaderClusterOptions) validateAndComplete() error {
 		}
 	}
 	if o.namespace == "" {
-		return fmt.Errorf("Namespace must be specified")
+		return fmt.Errorf("namespace must be specified")
 	}
 	if o.antreaVersion == "" {
 		o.antreaVersion = "latest"

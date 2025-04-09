@@ -51,7 +51,7 @@ func UnpackDir(fs afero.Fs, fileName string, targetDir string) error {
 	defer reader.Close()
 	tarReader := tar.NewReader(reader)
 
-	for true {
+	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
 			break

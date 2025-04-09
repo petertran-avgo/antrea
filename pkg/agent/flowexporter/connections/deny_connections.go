@@ -46,7 +46,6 @@ func (ds *DenyConnectionStore) RunPeriodicDeletion(stopCh <-chan struct{}) {
 	for {
 		select {
 		case <-stopCh:
-			break
 		case <-pollTicker.C:
 			deleteIfStaleConn := func(key flowexporter.ConnectionKey, conn *flowexporter.Connection) error {
 				if conn.ReadyToDelete || time.Since(conn.LastExportTime) >= ds.staleConnectionTimeout {
@@ -86,8 +85,8 @@ func (ds *DenyConnectionStore) AddOrUpdateConn(conn *flowexporter.Connection, ti
 		if !exists {
 			ds.expirePriorityQueue.WriteItemToQueue(connKey, conn)
 		} else {
-			ds.connectionStore.expirePriorityQueue.Update(existingItem, existingItem.ActiveExpireTime,
-				time.Now().Add(ds.connectionStore.expirePriorityQueue.IdleFlowTimeout))
+			ds.expirePriorityQueue.Update(existingItem, existingItem.ActiveExpireTime,
+				time.Now().Add(ds.expirePriorityQueue.IdleFlowTimeout))
 		}
 		klog.V(4).InfoS("Deny connection has been updated", "connection", conn)
 	} else {
@@ -120,7 +119,7 @@ func (ds *DenyConnectionStore) GetExpiredConns(expiredConns []flowexporter.Conne
 	ds.AcquireConnStoreLock()
 	defer ds.ReleaseConnStoreLock()
 	for i := 0; i < maxSize; i++ {
-		pqItem := ds.connectionStore.expirePriorityQueue.GetTopExpiredItem(currTime)
+		pqItem := ds.expirePriorityQueue.GetTopExpiredItem(currTime)
 		if pqItem == nil {
 			break
 		}
@@ -137,7 +136,7 @@ func (ds *DenyConnectionStore) GetExpiredConns(expiredConns []flowexporter.Conne
 		}
 		ds.UpdateConnAndQueue(pqItem, currTime)
 	}
-	return expiredConns, ds.connectionStore.expirePriorityQueue.GetExpiryFromExpirePriorityQueue()
+	return expiredConns, ds.expirePriorityQueue.GetExpiryFromExpirePriorityQueue()
 }
 
 // deleteConnWithoutLock deletes the connection from the connection map given
@@ -153,5 +152,5 @@ func (ds *DenyConnectionStore) deleteConnWithoutLock(connKey flowexporter.Connec
 }
 
 func (ds *DenyConnectionStore) GetPriorityQueue() *priorityqueue.ExpirePriorityQueue {
-	return ds.connectionStore.expirePriorityQueue
+	return ds.expirePriorityQueue
 }

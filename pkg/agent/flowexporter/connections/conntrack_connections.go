@@ -86,7 +86,6 @@ func (cs *ConntrackConnectionStore) Run(stopCh <-chan struct{}) {
 	for {
 		select {
 		case <-stopCh:
-			break
 		case <-pollTicker.C:
 			_, err := cs.Poll()
 			if err != nil {
@@ -263,8 +262,8 @@ func (cs *ConntrackConnectionStore) AddOrUpdateConn(conn *flowexporter.Connectio
 				// active again now, we create a new pqItem and add it to PQ and map.
 				cs.expirePriorityQueue.WriteItemToQueue(connKey, existingConn)
 			} else {
-				cs.connectionStore.expirePriorityQueue.Update(existingItem, existingItem.ActiveExpireTime,
-					time.Now().Add(cs.connectionStore.expirePriorityQueue.IdleFlowTimeout))
+				cs.expirePriorityQueue.Update(existingItem, existingItem.ActiveExpireTime,
+					time.Now().Add(cs.expirePriorityQueue.IdleFlowTimeout))
 			}
 		}
 		klog.V(4).InfoS("Antrea flow updated", "connection", existingConn)
@@ -306,7 +305,7 @@ func (cs *ConntrackConnectionStore) GetExpiredConns(expiredConns []flowexporter.
 	cs.AcquireConnStoreLock()
 	defer cs.ReleaseConnStoreLock()
 	for i := 0; i < maxSize; i++ {
-		pqItem := cs.connectionStore.expirePriorityQueue.GetTopExpiredItem(currTime)
+		pqItem := cs.expirePriorityQueue.GetTopExpiredItem(currTime)
 		if pqItem == nil {
 			break
 		}
@@ -324,7 +323,7 @@ func (cs *ConntrackConnectionStore) GetExpiredConns(expiredConns []flowexporter.
 		}
 		cs.UpdateConnAndQueue(pqItem, currTime)
 	}
-	return expiredConns, cs.connectionStore.expirePriorityQueue.GetExpiryFromExpirePriorityQueue()
+	return expiredConns, cs.expirePriorityQueue.GetExpiryFromExpirePriorityQueue()
 }
 
 // deleteConnWithoutLock deletes the connection from the connection map given
@@ -340,7 +339,7 @@ func (cs *ConntrackConnectionStore) deleteConnWithoutLock(connKey flowexporter.C
 }
 
 func (cs *ConntrackConnectionStore) GetPriorityQueue() *priorityqueue.ExpirePriorityQueue {
-	return cs.connectionStore.expirePriorityQueue
+	return cs.expirePriorityQueue
 }
 
 func (cs *ConntrackConnectionStore) fillL7EventInfo(l7EventMap map[flowexporter.Tuple]L7ProtocolFields) {

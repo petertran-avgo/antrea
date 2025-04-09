@@ -365,7 +365,7 @@ func (d *AntreaIPAM) waitForControllerReady() error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("Antrea IPAM driver not ready: %v", err)
+		return fmt.Errorf("antrea IPAM driver not ready: %v", err)
 	}
 	return nil
 }

@@ -51,7 +51,7 @@ func (provider *KindProvider) RunCommandOnNodeExt(nodeName, cmd string, envs map
 
 func (provider *KindProvider) GetKubeconfigPath() (string, error) {
 	if _, err := os.Stat(*kindKubeconfigPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("Kubeconfig file not found at expected location '%s'", *kindKubeconfigPath)
+		return "", fmt.Errorf("kubeconfig file not found at expected location '%s'", *kindKubeconfigPath)
 	}
 	return *kindKubeconfigPath, nil
 }
@@ -74,7 +74,7 @@ func NewKindProvider(configPath string) (ProviderInterface, error) {
 	// Run docker ps to fetch control-plane Node name
 	rc, stdout, _, err := exec.RunDockerPsFilterCommand("name=control-plane")
 	if err != nil || rc != 0 {
-		return nil, fmt.Errorf("Error when running docker ps filter command: %s", stdout)
+		return nil, fmt.Errorf("error when running docker ps filter command: %s", stdout)
 	}
 	slicedOutput := strings.Fields(stdout)
 	provider.controlPlaneNodeName = slicedOutput[len(slicedOutput)-1]

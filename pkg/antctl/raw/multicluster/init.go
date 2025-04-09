@@ -43,13 +43,13 @@ var initOpts *initOptions
 
 func (o *initOptions) validate(cmd *cobra.Command) error {
 	if o.namespace == "" {
-		return fmt.Errorf("Namespace must be specified")
+		return fmt.Errorf("namespace must be specified")
 	}
 	if o.clusterSet == "" {
-		return fmt.Errorf("ClusterSet must be provided")
+		return fmt.Errorf("clusterSet must be provided")
 	}
 	if o.clusterID == "" {
-		return fmt.Errorf("ClusterID must be provided")
+		return fmt.Errorf("clusterID must be provided")
 	}
 	var err error
 	if o.k8sClient == nil {

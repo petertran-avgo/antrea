@@ -30,7 +30,7 @@ func (t *PodToInternetConnectivityTest) Run(ctx context.Context, testContext *te
 		srcPod := testContext.namespace + "/" + clientPod.Name
 		testContext.Log("Validating connectivity from Pod %s to the world (api.github.com)...", srcPod)
 		if err := testContext.tcpProbe(ctx, clientPod.Name, "", "api.github.com", 80); err != nil {
-			return fmt.Errorf("Pod %s was not able to connect to api.github.com: %w", srcPod, err)
+			return fmt.Errorf("pod %s was not able to connect to api.github.com: %w", srcPod, err)
 		}
 		testContext.Log("Pod %s was able to connect to api.github.com", srcPod)
 	}

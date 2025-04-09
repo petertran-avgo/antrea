@@ -40,15 +40,15 @@ const (
 
 var (
 	errOrganizationNotAntrea    = fmt.Errorf("subject organization is not %s", antreaapis.AntreaOrganizationName)
-	errDNSSANNotMatchCommonName = fmt.Errorf("DNS subjectAltNames do not match subject common name")
+	errDNSSANNotMatchCommonName = fmt.Errorf("dns subjectAltNames do not match subject common name")
 	errEmailSANNotAllowed       = fmt.Errorf("email subjectAltNames are not allowed")
-	errIPSANNotAllowed          = fmt.Errorf("IP subjectAltNames are not allowed")
-	errURISANNotAllowed         = fmt.Errorf("URI subjectAltNames are not allowed")
+	errIPSANNotAllowed          = fmt.Errorf("ip subjectAltNames are not allowed")
+	errURISANNotAllowed         = fmt.Errorf("uri subjectAltNames are not allowed")
 	errCommonNameRequired       = fmt.Errorf("subject common name is required")
 	errExtraFieldsRequired      = fmt.Errorf("extra values must contain %q and %q", sautil.PodNameKey, sautil.PodUIDKey)
-	errPodUIDMismatch           = fmt.Errorf("Pod UID does not match")
-	errPodNotOnNode             = fmt.Errorf("Pod is not on requested Node")
-	errUserUnauthorized         = fmt.Errorf("Unrecognized username")
+	errPodUIDMismatch           = fmt.Errorf("pod UID does not match")
+	errPodNotOnNode             = fmt.Errorf("pod is not on requested Node")
+	errUserUnauthorized         = fmt.Errorf("unrecognized username")
 )
 
 // isCertificateRequestApproved returns true if a certificate request has the

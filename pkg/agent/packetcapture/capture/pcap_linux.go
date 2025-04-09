@@ -88,7 +88,6 @@ func (p *pcapCapture) Capture(ctx context.Context, device string, snapLen int, s
 			return nil, ctx.Err()
 		case <-packetCh:
 			klog.V(5).InfoS("Found irrelevant packet, discard it", "device", device)
-			break
 		case <-time.After(50 * time.Millisecond):
 			// timeout: channel is drained so socket is drained
 			// install the correct BPF filter

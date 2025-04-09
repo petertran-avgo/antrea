@@ -45,7 +45,7 @@ var memberTokenExamples = strings.Trim(`
 
 func (o *memberTokenOptions) validateAndComplete(cmd *cobra.Command) error {
 	if o.namespace == "" {
-		return fmt.Errorf("Namespace must be specified")
+		return fmt.Errorf("namespace must be specified")
 	}
 	var err error
 	if o.k8sClient == nil {

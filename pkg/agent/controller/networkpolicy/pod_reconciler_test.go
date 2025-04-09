@@ -99,7 +99,7 @@ var (
 		UID:  "uid2",
 	}
 
-	transientError = errors.New("Transient OVS error")
+	errTransient = errors.New("transient OVS error")
 )
 
 func newCIDR(cidrStr string) *net.IPNet {
@@ -864,14 +864,14 @@ func TestReconcilerReconcileServiceRelatedRule(t *testing.T) {
 	}
 }
 
-// TestReconcileWithTransientError ensures the podReconciler can reconcile a rule properly after the first attempt meets
+// TestReconcileWitherrTransient ensures the podReconciler can reconcile a rule properly after the first attempt meets
 // transient error.
 // The input rule is an egress rule with named port, applying to 3 Pods and 1 IPBlock. The first 2 Pods have different
 // port numbers for the named port and the 3rd Pod cannot resolve it.
 // The first reconciling is supposed to fail without any openflow IDs persisted.
 // The second reconciling is supposed to succeed with proper PolicyRules installed and all openflow IDs persisted.
 // The third reconciling is supposed to do nothing.
-func TestReconcileWithTransientError(t *testing.T) {
+func TestReconcileWitherrTransient(t *testing.T) {
 	ifaceStore := interfacestore.NewInterfaceStore()
 	ifaceStore.AddInterface(
 		&interfacestore.InterfaceConfig{
@@ -919,7 +919,7 @@ func TestReconcileWithTransientError(t *testing.T) {
 	r.idAllocator.deleteInterval = 0
 
 	// Make the first call fail.
-	mockOFClient.EXPECT().InstallPolicyRuleFlows(gomock.Any()).Return(transientError).Times(1)
+	mockOFClient.EXPECT().InstallPolicyRuleFlows(gomock.Any()).Return(errTransient).Times(1)
 	err := r.Reconcile(egressRule)
 	assert.Error(t, err)
 	// Ensure the openflow ID is not persistent in podPolicyLastRealized and is released to idAllocator upon error.

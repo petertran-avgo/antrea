@@ -265,9 +265,9 @@ func getCRDStorageVersion(crd *apiextv1.CustomResourceDefinition) string {
 }
 
 func newUnexpectedChangeError(crd *apiextv1.CustomResourceDefinition) error {
-	errorFmt := "The CRD %q unexpectedly changed during the upgrade. This means that either an object was persisted in a\n" +
+	errorFmt := "the CRD %q unexpectedly changed during the upgrade. This means that either an object was persisted in a\n" +
 		"non-storage version, or the storage version was changed by someone else during the upgrade process.\n" +
 		"Please ensure that no changes to the CRDs are made during the upgrade process and re-run the command\n" +
-		"until you no longer see this message."
+		"until you no longer see this message"
 	return fmt.Errorf(errorFmt, crd.Name)
 }

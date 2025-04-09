@@ -42,7 +42,7 @@ func (t *checkK8sVersion) Run(ctx context.Context, testContext *testContext) err
 	if currentVersion.GTE(minVersion) {
 		testContext.Log("Kubernetes server version is compatible with Antrea. Kubernetes version: %s", serverVersion.GitVersion)
 	} else {
-		return fmt.Errorf("Kubernetes min version required: 1.19")
+		return fmt.Errorf("kubernetes min version required: 1.19")
 	}
 	return nil
 }

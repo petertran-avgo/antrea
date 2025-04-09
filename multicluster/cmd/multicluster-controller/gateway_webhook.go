@@ -62,7 +62,7 @@ func (v *gatewayValidator) Handle(ctx context.Context, req admission.Request) ad
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 		if saName != mcControllerSAName && saName != antreaAgentSAName {
-			return admission.Errored(http.StatusPreconditionFailed, fmt.Errorf("Gateway can only be created or updated by Antrea Agent or Multi-cluster Controller"))
+			return admission.Errored(http.StatusPreconditionFailed, fmt.Errorf("gateway can only be created or updated by Antrea Agent or Multi-cluster Controller"))
 		}
 	}
 	return admission.Allowed("")

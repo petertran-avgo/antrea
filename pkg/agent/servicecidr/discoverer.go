@@ -109,7 +109,7 @@ func (d *Discoverer) GetServiceCIDRs() ([]*net.IPNet, error) {
 	d.RLock()
 	defer d.RUnlock()
 	if !d.initialized {
-		return nil, fmt.Errorf("Service CIDR discoverer is not initialized yet")
+		return nil, fmt.Errorf("service CIDR discoverer is not initialized yet")
 	}
 	var serviceCIDRs []*net.IPNet
 	if d.serviceIPv4CIDR != nil {

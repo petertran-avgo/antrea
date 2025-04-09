@@ -352,7 +352,7 @@ func NewMulticastController(ofClient openflow.Client,
 
 func (c *Controller) Initialize() error {
 	if !c.ipv4Enabled {
-		return fmt.Errorf("Multicast is not supported on an IPv6-only cluster")
+		return fmt.Errorf("multicast is not supported on an IPv6-only cluster")
 	} else if c.ipv6Enabled {
 		klog.InfoS("Multicast only works with IPv4 traffic on a dual-stack cluster")
 	}
@@ -581,7 +581,7 @@ func (c *Controller) syncGroup(groupKey string) error {
 // groupIsStale returns true if no local members in the group, or there is no IGMP report received after c.mcastGroupTimeout.
 func (c *Controller) groupIsStale(status *GroupMemberStatus) bool {
 	membersCount := len(status.localMembers)
-	diff := time.Now().Sub(status.lastIGMPReport)
+	diff := time.Since(status.lastIGMPReport)
 	return membersCount == 0 || diff > c.mcastGroupTimeout
 }
 
@@ -867,9 +867,10 @@ func (c *Controller) processNextNodeItem() bool {
 
 func memberExists(status *GroupMemberStatus, e *mcastGroupEvent) bool {
 	var exist bool
-	if e.iface.Type == interfacestore.ContainerInterface {
+	switch e.iface.Type {
+	case interfacestore.ContainerInterface:
 		_, exist = status.localMembers[e.iface.InterfaceName]
-	} else if e.iface.Type == interfacestore.TunnelInterface {
+	case interfacestore.TunnelInterface:
 		exist = status.remoteMembers.Has(e.srcNode.String())
 	}
 	return exist
