@@ -412,6 +412,7 @@ func (c *Client) Save() ([]byte, error) {
 		default:
 			cmd = "iptables-save"
 		}
+		// #nosec G204 -- `cmd` variable does not have user input
 		data, err := exec.Command(cmd, "-c").CombinedOutput()
 		if err != nil {
 			return nil, err
