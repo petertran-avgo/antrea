@@ -38,6 +38,8 @@ linters:
         - name: var-declaration
         - name: duplicated-imports
   exclusions:
+    presets:
+      - legacy
     paths:
       - ^third_party/.*
 formatters:
@@ -51,3 +53,7 @@ formatters:
   exclusions:
     paths:
       - ^third_party/.*
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
