@@ -462,12 +462,12 @@ func TestSyncRoutes(t *testing.T) {
 		assert.NoError(t, routeClient.AddRoutes(peerCIDR, tc.nodeName, tc.peerIP, nhCIDRIP), "adding routes failed")
 
 		listCmd := fmt.Sprintf("ip route show table 0 exact %s", peerCIDR)
-		expOutput, err := exec.Command("bash", "-c", listCmd).Output()
+		expOutput, err := exec.Command("bash", "-c", listCmd).Output() // #nosec G204 -- safe to do in testing
 		assert.NoError(t, err, "error executing ip route command: %s", listCmd)
 
 		if len(expOutput) > 0 {
 			delCmd := fmt.Sprintf("ip route del %s", peerCIDR.String())
-			_, err = exec.Command("bash", "-c", delCmd).Output()
+			_, err = exec.Command("bash", "-c", delCmd).Output() // #nosec G204 -- safe to do in testing
 			assert.NoError(t, err, "error executing ip route command: %s", delCmd)
 		}
 
@@ -477,7 +477,7 @@ func TestSyncRoutes(t *testing.T) {
 		go routeClient.Run(stopCh)
 		time.Sleep(route.SyncInterval) // wait for one iteration of sync operation.
 
-		output, err := exec.Command("bash", "-c", listCmd).Output()
+		output, err := exec.Command("bash", "-c", listCmd).Output() // #nosec G204 -- safe to do in testing
 		assert.NoError(t, err, "error executing ip route command: %s", listCmd)
 		assert.Equal(t, expOutput, output, "error syncing route")
 	}

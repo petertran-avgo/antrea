@@ -39,7 +39,7 @@ func PrepareOVSBridge(brName string) error {
 	// ensures that the integration tests can be run with Docker Desktop on
 	// macOS.
 	cmdStr := fmt.Sprintf("ovs-vsctl --may-exist add-br %s -- set Bridge %s protocols='OpenFlow10,OpenFlow15' datapath_type=netdev", brName, brName)
-	err := exec.Command("/bin/sh", "-c", cmdStr).Run()
+	err := exec.Command("/bin/sh", "-c", cmdStr).Run() // #nosec G204 -- safe to do in testing
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func PrepareOVSBridge(brName string) error {
 
 func DeleteOVSBridge(brName string) error {
 	cmdStr := fmt.Sprintf("ovs-vsctl --if-exist del-br %s", brName)
-	err := exec.Command("/bin/sh", "-c", cmdStr).Run()
+	err := exec.Command("/bin/sh", "-c", cmdStr).Run() // #nosec G204 -- safe to do in testing
 	if err != nil {
 		return err
 	}
