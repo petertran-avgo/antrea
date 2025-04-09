@@ -32,6 +32,6 @@ func runOfctlCmd(ctx context.Context, openflow15 bool, cmd string, bridge string
 	if openflow15 {
 		cmdArgs = append(cmdArgs, "-O", "Openflow15")
 	}
-	ovsCmd := exec.CommandContext(ctx, "ovs-ofctl", cmdArgs...)
+	ovsCmd := exec.CommandContext(ctx, "ovs-ofctl", cmdArgs...) // #nosec G204 -- only used by agent
 	return ovsCmd.Output()
 }

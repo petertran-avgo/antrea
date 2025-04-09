@@ -525,7 +525,7 @@ func startSuricata() {
 		klog.ErrorS(err, "Failed to create L7 Network Policy log directory", "directory", antreaSuricataLogPath)
 	}
 	// Start Suricata with default Suricata config file /etc/suricata/suricata.yaml.
-	cmd := exec.Command("suricata", "-c", defaultSuricataConfigPath, "--af-packet", "-D", "-l", antreaSuricataLogPath)
+	cmd := exec.Command("suricata", "-c", defaultSuricataConfigPath, "--af-packet", "-D", "-l", antreaSuricataLogPath) // #nosec G204 -- `defaultSuricataConfigPath` and `antreaSuricataLogPath` variables do not have user input
 	if err := cmd.Run(); err != nil {
 		klog.ErrorS(err, "Failed to start Suricata instance")
 	}

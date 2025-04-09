@@ -372,7 +372,7 @@ func (c *Client) Restore(data string, flush bool, useIPv6 bool) error {
 	if useIPv6 {
 		iptablesCmd = "ip6tables-restore"
 	}
-	cmd := exec.Command(iptablesCmd, args...)
+	cmd := exec.Command(iptablesCmd, args...) // #nosec G204 -- `iptablesCmd` and `args` contain no user input
 	cmd.Stdin = bytes.NewBuffer([]byte(data))
 	stderr := &bytes.Buffer{}
 	cmd.Stderr = stderr
@@ -412,6 +412,7 @@ func (c *Client) Save() ([]byte, error) {
 		default:
 			cmd = "iptables-save"
 		}
+		// #nosec G204 -- `cmd` variable does not have user input
 		data, err := exec.Command(cmd, "-c").CombinedOutput()
 		if err != nil {
 			return nil, err

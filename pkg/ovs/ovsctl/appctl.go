@@ -39,7 +39,7 @@ func (r *ovsAppctlRunner) RunAppctlCmd(cmd string, needsBridge bool, args ...str
 		cmdArgs = append(cmdArgs, r.bridge)
 	}
 	cmdArgs = append(cmdArgs, args...)
-	ovsCmd := exec.CommandContext(context.TODO(), "ovs-appctl", cmdArgs...)
+	ovsCmd := exec.CommandContext(context.TODO(), "ovs-appctl", cmdArgs...) // #nosec G204 -- only used by agent
 	out, err := ovsCmd.CombinedOutput()
 	if err != nil {
 		return nil, NewExecError(err, string(out))
