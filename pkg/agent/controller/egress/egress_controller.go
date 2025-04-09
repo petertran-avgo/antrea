@@ -1365,7 +1365,7 @@ func (c *EgressController) GetEgressIPByMark(mark uint32) (string, error) {
 // GetEgress returns effective EgressName, EgressIP and EgressNode name of Egress applied on a Pod.
 func (c *EgressController) GetEgress(ns, podName string) (string, string, string, error) {
 	if c == nil {
-		return "", "", "", fmt.Errorf("Egress is not enabled")
+		return "", "", "", fmt.Errorf("egress is not enabled")
 	}
 	pod := k8s.NamespacedName(ns, podName)
 	egressName, exists := func() (string, bool) {

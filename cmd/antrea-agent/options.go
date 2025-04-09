@@ -238,11 +238,11 @@ func (o *Options) validateAntreaProxyConfig(encapMode config.TrafficEncapModeTyp
 	if !o.enableAntreaProxy {
 		// Validate Service CIDR configuration if AntreaProxy is not enabled.
 		if _, _, err := net.ParseCIDR(o.config.ServiceCIDR); err != nil {
-			return fmt.Errorf("Service CIDR %s is invalid", o.config.ServiceCIDR)
+			return fmt.Errorf("service CIDR %s is invalid", o.config.ServiceCIDR)
 		}
 		if o.config.ServiceCIDRv6 != "" {
 			if _, _, err := net.ParseCIDR(o.config.ServiceCIDRv6); err != nil {
-				return fmt.Errorf("Service CIDR v6 %s is invalid", o.config.ServiceCIDRv6)
+				return fmt.Errorf("service CIDR v6 %s is invalid", o.config.ServiceCIDRv6)
 			}
 		}
 		if len(o.config.AntreaProxy.SkipServices) > 0 {
@@ -335,7 +335,7 @@ func (o *Options) validateMulticastConfig(encryptionMode config.TrafficEncryptio
 	if features.DefaultFeatureGate.Enabled(features.Multicast) && o.config.Multicast.Enable {
 		var err error
 		if encryptionMode != config.TrafficEncryptionModeNone {
-			return fmt.Errorf("Multicast feature doesn't work with the current encryption mode '%s'", encryptionMode)
+			return fmt.Errorf("multicast feature doesn't work with the current encryption mode '%s'", encryptionMode)
 		}
 		if o.config.Multicast.IGMPQueryInterval != "" {
 			o.igmpQueryInterval, err = time.ParseDuration(o.config.Multicast.IGMPQueryInterval)
@@ -360,16 +360,16 @@ func (o *Options) validateAntreaIPAMConfig() error {
 		return nil
 	}
 	if !features.DefaultFeatureGate.Enabled(features.AntreaIPAM) {
-		return fmt.Errorf("AntreaIPAM feature gate must be enabled to configure bridging mode")
+		return fmt.Errorf("antreaIPAM feature gate must be enabled to configure bridging mode")
 	}
 	if !strings.EqualFold(o.config.TrafficEncapMode, config.TrafficEncapModeNoEncap.String()) {
-		return fmt.Errorf("Bridging mode requires 'noEncap' TrafficEncapMode, current: %s",
+		return fmt.Errorf("bridging mode requires 'noEncap' TrafficEncapMode, current: %s",
 			o.config.TrafficEncapMode)
 	}
 	// TODO(gran): support SNAT for Per-Node IPAM Pods
 	// SNAT needs to be updated to bypass traffic from AntreaIPAM Pod to Per-Node IPAM Pod
 	if !o.config.NoSNAT {
-		return fmt.Errorf("Bridging mode requires noSNAT")
+		return fmt.Errorf("bridging mode requires noSNAT")
 	}
 	return nil
 }
@@ -385,15 +385,15 @@ func (o *Options) validateMulticlusterConfig(encapMode config.TrafficEncapModeTy
 	}
 
 	if !o.config.Multicluster.EnableGateway && o.config.Multicluster.EnableStretchedNetworkPolicy {
-		return fmt.Errorf("Multi-cluster Gateway must be enabled to enable StretchedNetworkPolicy")
+		return fmt.Errorf("multi-cluster Gateway must be enabled to enable StretchedNetworkPolicy")
 	}
 	_, multiclusterEncryptionMode := config.GetTrafficEncryptionModeFromStr(o.config.Multicluster.TrafficEncryptionMode)
 	if multiclusterEncryptionMode == config.TrafficEncryptionModeWireGuard && encryptionMode != config.TrafficEncryptionModeNone {
-		return fmt.Errorf("Antrea Multi-cluster WireGuard does not support in-cluster encryption mode %s", o.config.TrafficEncryptionMode)
+		return fmt.Errorf("antrea Multi-cluster WireGuard does not support in-cluster encryption mode %s", o.config.TrafficEncryptionMode)
 	}
 
 	if encapMode.SupportsEncap() && encryptionMode == config.TrafficEncryptionModeWireGuard {
-		return fmt.Errorf("Multi-cluster Gateway doesn't support in-cluster WireGuard encryption")
+		return fmt.Errorf("multi-cluster Gateway doesn't support in-cluster WireGuard encryption")
 	}
 	return nil
 }
@@ -519,7 +519,7 @@ func (o *Options) validateEgressConfig(encapMode config.TrafficEncapModeType) er
 	for _, cidr := range o.config.Egress.ExceptCIDRs {
 		_, _, err := net.ParseCIDR(cidr)
 		if err != nil {
-			return fmt.Errorf("Egress Except CIDR %s is invalid", cidr)
+			return fmt.Errorf("egress Except CIDR %s is invalid", cidr)
 		}
 	}
 	if o.config.Egress.MaxEgressIPsPerNode > defaultMaxEgressIPsPerNode {
