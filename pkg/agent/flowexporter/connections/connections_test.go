@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 
 	"antrea.io/antrea/pkg/agent/flowexporter"
 	connectionstest "antrea.io/antrea/pkg/agent/flowexporter/connections/testing"
@@ -131,4 +132,47 @@ func TestConnectionStore_DeleteConnWithoutLock(t *testing.T) {
 	_, exists = conntrackConnStore.GetConnByKey(connKey)
 	assert.Equal(t, false, exists, "connection should be deleted in connection store")
 	checkAntreaConnectionMetrics(t, len(conntrackConnStore.connections))
+}
+
+func TestValidateProtocolFilter(t *testing.T) {
+	tcp := inverseServiceProtocolMap[corev1.ProtocolTCP]
+	udp := inverseServiceProtocolMap[corev1.ProtocolUDP]
+	sctp := inverseServiceProtocolMap[corev1.ProtocolSCTP]
+	testCases := []struct {
+		name           string
+		protocolFilter []string
+		want           []uint8
+	}{
+		{
+			"No protocols",
+			[]string{},
+			[]uint8{},
+		},
+		{
+			"Valid protocols",
+			[]string{"TCP", "UDP"},
+			[]uint8{tcp, udp},
+		},
+		{
+			"Valid protocols and some invalid typo'd protocols",
+			[]string{"TCP", "scctp"},
+			[]uint8{tcp},
+		},
+		{
+			"Mixed case protocols",
+			[]string{"TCP", "udp", "sctp"},
+			[]uint8{tcp, udp, sctp},
+		},
+		{
+			"Invalid typo'd protocols",
+			[]string{"tpc", "udp", "scctp"},
+			[]uint8{udp},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := validateProtocolFilter(tc.protocolFilter)
+			assert.Equal(t, tc.want, got)
+		})
+	}
 }

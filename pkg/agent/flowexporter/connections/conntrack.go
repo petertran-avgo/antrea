@@ -17,7 +17,10 @@ package connections
 import (
 	"net"
 	"net/netip"
+	"slices"
+	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
 	"antrea.io/antrea/pkg/agent/config"
@@ -26,7 +29,7 @@ import (
 )
 
 // InitializeConnTrackDumper initializes the ConnTrackDumper interface for different OS and datapath types.
-func InitializeConnTrackDumper(nodeConfig *config.NodeConfig, serviceCIDRv4 *net.IPNet, serviceCIDRv6 *net.IPNet, ovsDatapathType ovsconfig.OVSDatapathType, isAntreaProxyEnabled bool) ConnTrackDumper {
+func InitializeConnTrackDumper(nodeConfig *config.NodeConfig, serviceCIDRv4 *net.IPNet, serviceCIDRv6 *net.IPNet, ovsDatapathType ovsconfig.OVSDatapathType, isAntreaProxyEnabled bool, protocolFilterConfig []string) ConnTrackDumper {
 	var svcCIDRv4, svcCIDRv6 netip.Prefix
 	if serviceCIDRv4 != nil {
 		svcCIDRv4 = netip.MustParsePrefix(serviceCIDRv4.String())
@@ -34,17 +37,43 @@ func InitializeConnTrackDumper(nodeConfig *config.NodeConfig, serviceCIDRv4 *net
 	if serviceCIDRv6 != nil {
 		svcCIDRv6 = netip.MustParsePrefix(serviceCIDRv6.String())
 	}
+
+	protocolFilter := validateProtocolFilter(protocolFilterConfig)
 	var connTrackDumper ConnTrackDumper
 	if ovsDatapathType == ovsconfig.OVSDatapathSystem {
-		connTrackDumper = NewConnTrackSystem(nodeConfig, svcCIDRv4, svcCIDRv6, isAntreaProxyEnabled)
+		connTrackDumper = NewConnTrackSystem(nodeConfig, svcCIDRv4, svcCIDRv6, isAntreaProxyEnabled, protocolFilter)
 	}
 	return connTrackDumper
 }
 
-func filterAntreaConns(conns []*flowexporter.Connection, nodeConfig *config.NodeConfig, serviceCIDR netip.Prefix, zoneFilter uint16, isAntreaProxyEnabled bool) []*flowexporter.Connection {
+// Return a subset of protocols of only supported protocols and log a mesasge
+// if unsupported protocols were found
+func validateProtocolFilter(protocols []string) []uint8 {
+	validatedProtocols := []uint8{}
+	invalidProtocols := []string{}
+	for _, protocol := range protocols {
+		protocolNumber, ok := inverseServiceProtocolMap[corev1.Protocol(strings.ToUpper(protocol))]
+		if !ok {
+			invalidProtocols = append(invalidProtocols, protocol)
+		} else {
+			validatedProtocols = append(validatedProtocols, protocolNumber)
+		}
+	}
+
+	if len(invalidProtocols) > 0 {
+		klog.Warningf("Parsing protocols for filtering and found an unsupported protocol(s) %q. See FlowExporter Config docs for supported protocols", strings.Join(invalidProtocols, ","))
+	}
+
+	return validatedProtocols
+}
+
+func filterAntreaConns(conns []*flowexporter.Connection, nodeConfig *config.NodeConfig, serviceCIDR netip.Prefix, zoneFilter uint16, isAntreaProxyEnabled bool, protocolFilter []uint8) []*flowexporter.Connection {
+
 	filteredConns := conns[:0]
 	gwIPv4, _ := netip.AddrFromSlice(nodeConfig.GatewayConfig.IPv4)
 	gwIPv6, _ := netip.AddrFromSlice(nodeConfig.GatewayConfig.IPv6)
+	protocolFilterSpecified := len(protocolFilter) > 0
+
 	for _, conn := range conns {
 		if conn.Zone != zoneFilter {
 			continue
@@ -74,6 +103,13 @@ func filterAntreaConns(conns []*flowexporter.Connection, nodeConfig *config.Node
 				continue
 			}
 		}
+
+		if protocolFilterSpecified {
+			if !slices.Contains(protocolFilter, conn.FlowKey.Protocol) {
+				continue
+			}
+		}
+
 		filteredConns = append(filteredConns, conn)
 	}
 	return filteredConns

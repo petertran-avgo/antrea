@@ -39,6 +39,12 @@ var serviceProtocolMap = map[uint8]corev1.Protocol{
 	132: corev1.ProtocolSCTP,
 }
 
+var inverseServiceProtocolMap = map[corev1.Protocol]uint8{
+	corev1.ProtocolTCP:  6,
+	corev1.ProtocolUDP:  17,
+	corev1.ProtocolSCTP: 132,
+}
+
 type ConntrackConnectionStore struct {
 	connDumper            ConnTrackDumper
 	v4Enabled             bool
