@@ -176,7 +176,7 @@ func TestCreateResources(t *testing.T) {
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
 	file := filepath.Join("..", "..", "..", "..", "..", "multicluster", "build", "yamls", "antrea-multicluster-leader-global.yml")
-	content, err := os.ReadFile(file)
+	content, err := os.ReadFile(file) // #nosec G304 -- safe in testing
 	if err != nil {
 		t.Errorf("Failed to open the file %s", file)
 	}

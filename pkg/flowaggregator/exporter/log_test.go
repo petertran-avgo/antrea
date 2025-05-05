@@ -58,8 +58,8 @@ func TestLog_UpdateOptions(t *testing.T) {
 	}
 
 	countRecords := func(path string) int {
-		data, err := os.ReadFile(path)
-		if err != nil { // assume this always means the file does not exist
+		data, err := os.ReadFile(path) // #nosec G304 -- safe in testing
+		if err != nil {                // assume this always means the file does not exist
 			return 0
 		}
 		return bytes.Count(data, []byte{'\n'})

@@ -21,7 +21,7 @@ import (
 
 // IsDirEmpty checks whether a directory is empty or not.
 func IsDirEmpty(name string) (bool, error) {
-	f, err := os.Open(name)
+	f, err := os.Open(name) // #nosec G304 -- safe in testing
 	if err != nil {
 		return false, err
 	}

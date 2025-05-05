@@ -213,7 +213,7 @@ func TestGarbageCollectContainerIPs(t *testing.T) {
 		netDir := filepath.Join(tempDir, network)
 		// create a file instead of a directory: GarbageCollectContainerIPs should return an
 		// error
-		_, err := os.Create(netDir)
+		_, err := os.Create(netDir) // #nosec G304 -- safe in testing
 		require.NoError(t, err)
 		defer os.Remove(netDir)
 		assert.ErrorContains(t, GarbageCollectContainerIPs(network, ips), "not a directory")

@@ -2929,7 +2929,7 @@ func (data *TestData) readPodFile(podName string, containerName string, nsName s
 func (data *TestData) copyPodFile(podName string, containerName string, nsName string, fileName string, destDir string) error {
 	getWriter := func(fileName string) *os.File {
 		destFile := filepath.Join(destDir, fileName)
-		f, err := os.Create(destFile)
+		f, err := os.Create(destFile) // #nosec G304 -- safe in testing
 		if err != nil {
 			log.Infof("Error when creating destination file '%s': %v\n", destFile, err)
 			return nil
@@ -2958,7 +2958,7 @@ func (data *TestData) copyNodeFiles(fileName string, destDir string) error {
 	// cannot be created. File must be closed by the caller.
 	getNodeWriter := func(fileName string) *os.File {
 		destFile := filepath.Join(destDir, fileName)
-		f, err := os.Create(destFile)
+		f, err := os.Create(destFile) // #nosec G304 -- safe in testing
 		if err != nil {
 			log.Infof("Error when creating coverage file '%s': %v\n", destFile, err)
 			return nil

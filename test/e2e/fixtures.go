@@ -358,7 +358,7 @@ func exportLogs(tb testing.TB, data *TestData, logsSubDir string, writeNodeLogs 
 	// file cannot be created. File must be closed by the caller.
 	getPodWriter := func(nodeName, podName, suffix string) *os.File {
 		logFile := filepath.Join(logsDir, fmt.Sprintf("%s-%s-%s", nodeName, podName, suffix))
-		f, err := os.Create(logFile)
+		f, err := os.Create(logFile) // #nosec G304 -- safe in testing
 		if err != nil {
 			tb.Errorf("Error when creating log file '%s': '%v'", logFile, err)
 			return nil
@@ -431,7 +431,7 @@ func exportLogs(tb testing.TB, data *TestData, logsSubDir string, writeNodeLogs 
 	// cannot be created. File must be closed by the caller.
 	getNodeWriter := func(nodeName, suffix string) *os.File {
 		logFile := filepath.Join(logsDir, fmt.Sprintf("%s-%s", nodeName, suffix))
-		f, err := os.Create(logFile)
+		f, err := os.Create(logFile) // #nosec G304 -- safe in testing
 		if err != nil {
 			tb.Errorf("Error when creating log file '%s': '%v'", logFile, err)
 			return nil

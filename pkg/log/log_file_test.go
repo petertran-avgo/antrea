@@ -100,7 +100,7 @@ func TestKlogFileLimits(t *testing.T) {
 	infoLogFileNum := 0
 	warningLogFileNum := 0
 	validateFn := func() {
-		f, err := os.Open(testLogDir)
+		f, err := os.Open(testLogDir) // #nosec G304 -- safe in testing
 		if err != nil {
 			t.Errorf("Failed to open log directory: %v", err)
 			return

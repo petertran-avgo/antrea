@@ -633,7 +633,7 @@ func runPacketCaptureTest(t *testing.T, data *TestData, tc pcTestCase) {
 	packetFile := getLocalPcapFilepath(tc.pc.Name)
 	require.NoError(t, data.copyPodFile(antreaPodName, "antrea-agent", "kube-system", packetFile, tmpDir))
 	defer os.Remove(dstFileName)
-	file, err := os.Open(dstFileName)
+	file, err := os.Open(dstFileName) // #nosec G304 -- safe in testing
 	require.NoError(t, err)
 	defer file.Close()
 	require.NoError(t, verifyPacketFile(t, tc.pc, file, tc.expectedStatus.NumberCaptured, *srcPodIPs.IPv4, *dstPodIPs.IPv4))

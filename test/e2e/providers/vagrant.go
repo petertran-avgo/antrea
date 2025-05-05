@@ -41,7 +41,7 @@ func importConfig() (*ssh_config.Config, error) {
 		return nil, fmt.Errorf("cannot compute path to infra/vagrant")
 	}
 	configPath := path.Join(vagrantPath, "ssh-config")
-	f, err := os.Open(configPath)
+	f, err := os.Open(configPath) // #nosec G304 -- safe in testing
 	if err != nil {
 		return nil, fmt.Errorf("cannot open ssh-config file: %v", err)
 	}
@@ -81,7 +81,7 @@ func convertConfig(inConfig *ssh_config.Config, name string) (string, *ssh.Clien
 
 	identityFile := values["IdentityFile"]
 	// Read the private key identified by identityFile.
-	key, err := os.ReadFile(identityFile)
+	key, err := os.ReadFile(identityFile) // #nosec G304 -- safe in testing
 	if err != nil {
 		return "", nil, fmt.Errorf("unable to read private key from file '%s': %v", identityFile, err)
 	}
