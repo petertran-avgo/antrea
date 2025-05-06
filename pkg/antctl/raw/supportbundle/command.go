@@ -622,7 +622,7 @@ func controllerRemoteRunE(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return fmt.Errorf("error when resolving node-list-file path: %w", err)
 			}
-			f, err := os.Open(nodeListFile)
+			f, err := os.Open(nodeListFile) // #nosec G304 -- `nodeListFile` is user input however caller is antctl user with file system access already
 			if err != nil {
 				return fmt.Errorf("error when opening node-list-file: %w", err)
 			}

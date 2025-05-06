@@ -387,7 +387,7 @@ func (c *Client) Restore(data string, flush bool, useIPv6 bool) error {
 	if c.restoreWaitSupported {
 		cmd.Args = append(cmd.Args, "-w", strconv.Itoa(waitSeconds), "-W", strconv.Itoa(waitIntervalMicroSeconds))
 	} else {
-		unlockFunc, err := Lock(XtablesLockFilePath, waitSeconds*time.Second)
+		unlockFunc, err := Lock(XtablesLockFilePath, waitSeconds*time.Second) // #nosec G304 -- `XtablesLockFilePath` is safe because it is set in this file
 		if err != nil {
 			return err
 		}

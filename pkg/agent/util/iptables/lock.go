@@ -35,7 +35,7 @@ const (
 // Lock acquires the provided file lock. It's thread-safe.
 // It will block until the lock is acquired or the timeout is reached.
 func Lock(lockFilePath string, timeout time.Duration) (func() error, error) {
-	lockFile, err := os.OpenFile(lockFilePath, os.O_CREATE, xtablesLockFilePermission)
+	lockFile, err := os.OpenFile(lockFilePath, os.O_CREATE, xtablesLockFilePermission) // #nosec G304 -- `lockFilePath` is safe because it is set in iptables.go as `XtablesLockFilePath`
 	if err != nil {
 		return nil, fmt.Errorf("error opening xtables lock file: %v", err)
 	}

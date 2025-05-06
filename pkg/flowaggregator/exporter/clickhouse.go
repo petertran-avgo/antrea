@@ -65,7 +65,7 @@ func NewClickHouseExporter(clusterUUID uuid.UUID, opt *options.Options) (*ClickH
 	if chConfig.CACert {
 		err := wait.PollUntilContextTimeout(context.TODO(), DefaultInterval, Timeout, false, func(ctx context.Context) (bool, error) {
 			caCertPath := path.Join(CertDir, CACertFile)
-			certificate, err := os.ReadFile(caCertPath)
+			certificate, err := os.ReadFile(caCertPath) // #nosec G304 -- `caCertPath` is safe as it comes from user configuration and not user input
 			if err != nil {
 				errMessage = err
 				return false, nil

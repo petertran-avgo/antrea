@@ -164,7 +164,7 @@ func deploy(cmd *cobra.Command, role string, version string, namespace string, f
 	}
 
 	if filename != "" {
-		content, err := os.ReadFile(filename)
+		content, err := os.ReadFile(filename) // #nosec G304 -- `filename` is user input however caller is antctl user with file system access already
 		if err != nil {
 			return err
 		}

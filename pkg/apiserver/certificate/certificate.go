@@ -59,7 +59,7 @@ func ApplyServerCert(selfSignedCert bool,
 		if err = wait.PollUntilContextTimeout(context.TODO(), 2*time.Second, caConfig.CertReadyTimeout, true,
 			func(ctx context.Context) (bool, error) {
 				for _, path := range []string{caCertPath, tlsCertPath, tlsKeyPath} {
-					f, err := os.Open(path)
+					f, err := os.Open(path) // #nosec G304 -- path is created from user configuration and not user input
 					if err != nil {
 						klog.Warningf("Couldn't read %s when applying server certificate, retrying", path)
 						return false, nil

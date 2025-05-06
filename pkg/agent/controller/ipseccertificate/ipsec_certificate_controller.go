@@ -317,7 +317,7 @@ func (c *Controller) HasSynced() bool {
 }
 
 func loadRootCA(caPath string) ([]*x509.Certificate, error) {
-	pemBlock, err := os.ReadFile(caPath)
+	pemBlock, err := os.ReadFile(caPath) // #nosec G304 -- caPath is created in code without user input
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +345,7 @@ func loadPrivateKey(privateKeyPath string) (crypto.Signer, error) {
 	_, err := os.Stat(privateKeyPath)
 	if err == nil {
 		// Load the private key contents from file.
-		keyPEMBytes, err = os.ReadFile(privateKeyPath)
+		keyPEMBytes, err = os.ReadFile(privateKeyPath) // #nosec G304 -- privateKeyPath is safe as it comes from user configuration and not user input
 		if err != nil {
 			return nil, fmt.Errorf("failed to read key file %s: %v", privateKeyPath, err)
 		}
@@ -370,7 +370,7 @@ func loadCertificate(certPath string) ([]*x509.Certificate, error) {
 	_, err := os.Stat(certPath)
 	if err == nil {
 		// Load the certificate from file.
-		certPEMBytes, err = os.ReadFile(certPath)
+		certPEMBytes, err = os.ReadFile(certPath) // #nosec G304 -- certPath is safe as it comes from user configuration and not user input
 		if err != nil {
 			return nil, fmt.Errorf("failed to read certificate file %s: %w", certPath, err)
 		}

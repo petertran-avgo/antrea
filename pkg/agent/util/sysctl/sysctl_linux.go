@@ -32,7 +32,7 @@ const (
 
 // GetSysctlNet returns the value for sysctl net.* settings
 func GetSysctlNet(sysctl string) (int, error) {
-	data, err := os.ReadFile(path.Join(sysctlNet, sysctl))
+	data, err := os.ReadFile(path.Join(sysctlNet, sysctl)) // #nosec G304 -- `sysctl` is safe as it does not come from user input
 	if err != nil {
 		return -1, err
 	}

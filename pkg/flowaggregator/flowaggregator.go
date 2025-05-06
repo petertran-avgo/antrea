@@ -153,7 +153,7 @@ func NewFlowAggregator(
 		return nil, fmt.Errorf("error when starting file watch on configuration dir: %v", err)
 	}
 
-	data, err := os.ReadFile(configFile)
+	data, err := os.ReadFile(configFile) // #nosec G304 -- configFile has user input but user is a command line user with existing file system access
 	if err != nil {
 		return nil, fmt.Errorf("cannot read FlowAggregator configuration file: %v", err)
 	}
