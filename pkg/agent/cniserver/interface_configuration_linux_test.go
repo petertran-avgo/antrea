@@ -128,6 +128,7 @@ func (ns *fakeNS) clear() {
 
 func createNS(t *testing.T, waitForComplete bool) *fakeNS {
 	nsPath := generateUUID()
+	// #nosec G103 -- fd is not accessed in testing
 	fakeNs := &fakeNS{path: nsPath, fd: uintptr(unsafe.Pointer(&nsPath)), waitCompleted: waitForComplete, stopCh: make(chan struct{})}
 	validNSs.Store(nsPath, fakeNs)
 	return fakeNs

@@ -119,10 +119,16 @@ func (a *RawSockAddrInet) IP() net.IP {
 		return nil
 	}
 	if a.Family == AF_INET {
+		// #nosec G103 -- unsafe pointer safely cast to `*RawSockaddrInet4` which is
+		// smaller than `RawSockAddrInet`. additionally we use `syscallN` in
+		// `CreateIPForwardEntry` to manage the population of `RawSockAddrInet.data`
 		addr := (*syscall.RawSockaddrInet4)(unsafe.Pointer(a))
 		return net.IPv4(addr.Addr[0], addr.Addr[1], addr.Addr[2], addr.Addr[3])
 	}
 	if a.Family == AF_INET6 {
+		// #nosec G103 -- unsafe pointer safely cast to `*RawSockaddrInet6` which is
+		// smaller than `RawSockAddrInet`. additionally we use `syscallN` in
+		// `CreateIPForwardEntry` to manage the population of `RawSockAddrInet.data`
 		addr := (*syscall.RawSockaddrInet6)(unsafe.Pointer(a))
 		return addr.Addr[:]
 	}
@@ -137,6 +143,7 @@ func NewRawSockAddrInetFromIP(ip net.IP) *RawSockAddrInet {
 	sockAddrInet := new(RawSockAddrInet)
 	if ip.To4() != nil {
 		addr, _ := netip.AddrFromSlice(ip.To4())
+		// #nosec G103 -- `addr4` is correctly used because `RawSockaddrInet4` is smaller than `RawSockAddrInet` and thus the data is correctly set without going out of bounds in memory
 		addr4 := (*windows.RawSockaddrInet4)(unsafe.Pointer(sockAddrInet))
 		addr4.Family = AF_INET
 		addr4.Addr = addr.As4()
@@ -145,6 +152,7 @@ func NewRawSockAddrInetFromIP(ip net.IP) *RawSockAddrInet {
 		return sockAddrInet
 	}
 	addr, _ := netip.AddrFromSlice(ip)
+	// #nosec G103 -- `addr6` is correctly used because `RawSockaddrInet6` is smaller than `RawSockAddrInet` and thus the data is correctly set without going out of bounds in memory
 	addr6 := (*windows.RawSockaddrInet6)(unsafe.Pointer(sockAddrInet))
 	addr6.Family = AF_INET6
 	addr6.Addr = addr.As16()
@@ -322,6 +330,8 @@ func NewNetIO() NetIOInterface {
 }
 
 func (n *netIO) GetIPInterfaceEntry(ipInterfaceRow *MibIPInterfaceRow) (errcode error) {
+	// #nosec G103 -- uintptr is safe from garbage collection because it's consumed before
+	// `ipInterfaceRow` is freed
 	r0, _, _ := n.syscallN(procGetIPInterfaceEntry.Addr(), uintptr(unsafe.Pointer(ipInterfaceRow)))
 	if r0 != 0 {
 		errcode = syscall.Errno(r0)
@@ -330,6 +340,8 @@ func (n *netIO) GetIPInterfaceEntry(ipInterfaceRow *MibIPInterfaceRow) (errcode 
 }
 
 func (n *netIO) SetIPInterfaceEntry(ipInterfaceRow *MibIPInterfaceRow) (errcode error) {
+	// #nosec G103 -- uintptr is safe from garbage collection because it's consumed before
+	// `ipInterfaceRow` is freed
 	r0, _, _ := n.syscallN(procSetIPInterfaceEntry.Addr(), uintptr(unsafe.Pointer(ipInterfaceRow)))
 	if r0 != 0 {
 		errcode = syscall.Errno(r0)
@@ -338,6 +350,8 @@ func (n *netIO) SetIPInterfaceEntry(ipInterfaceRow *MibIPInterfaceRow) (errcode 
 }
 
 func (n *netIO) CreateIPForwardEntry(ipForwardEntry *MibIPForwardRow) (errcode error) {
+	// #nosec G103 -- uintptr is safe from garbage collection because it's consumed before
+	// `ipForwardEntry` is freed
 	r0, _, _ := n.syscallN(procCreateIPForwardEntry.Addr(), uintptr(unsafe.Pointer(ipForwardEntry)))
 	if r0 != 0 {
 		errcode = syscall.Errno(r0)
@@ -346,6 +360,8 @@ func (n *netIO) CreateIPForwardEntry(ipForwardEntry *MibIPForwardRow) (errcode e
 }
 
 func (n *netIO) DeleteIPForwardEntry(ipForwardEntry *MibIPForwardRow) (errcode error) {
+	// #nosec G103 -- uintptr is safe from garbage collection because it's consumed before
+	// `ipForwardEntry` is freed
 	r0, _, _ := n.syscallN(procDeleteIPForwardEntry.Addr(), uintptr(unsafe.Pointer(ipForwardEntry)))
 	if r0 != 0 {
 		errcode = syscall.Errno(r0)
@@ -358,6 +374,8 @@ func (n *netIO) freeMibTable(table unsafe.Pointer) {
 }
 
 func getIPForwardTable(family uint16, ipForwardTable **MibIPForwardTable) (errcode error) {
+	// #nosec G103 -- uintptr is safe from garbage collection because it's consumed before
+	// `ipForwardTable` is freed
 	r0, _, _ := syscall.SyscallN(procGetIPForwardTable.Addr(), uintptr(family), uintptr(unsafe.Pointer(ipForwardTable)))
 	if r0 != 0 {
 		errcode = syscall.Errno(r0)
@@ -371,11 +389,13 @@ func (n *netIO) ListIPForwardRows(family uint16) ([]MibIPForwardRow, error) {
 	if err != nil {
 		return nil, os.NewSyscallError("iphlpapi.GetIpForwardTable", err)
 	}
+	// #nosec G103 -- unsafe pointer is safely used for freeing memory after contents get copied
 	defer n.freeMibTable(unsafe.Pointer(table))
 
 	// Copy the rows from the table into a new slice as the table's memory will be freed.
 	// Since MibIPForwardRow contains only value data (no references), the operation performs a deep copy.
 	rows := make([]MibIPForwardRow, 0, table.NumEntries)
+	// #nosec G103 -- safe usage of unsafe.Slice because `table.Table` is of type `MibIPForwardRow` which matches the array type of `rows`
 	rows = append(rows, unsafe.Slice(&table.Table[0], table.NumEntries)...)
 	return rows, nil
 }

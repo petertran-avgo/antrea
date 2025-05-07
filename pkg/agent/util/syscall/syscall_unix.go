@@ -43,13 +43,19 @@ func ioctlPtr(fd int, req uint, arg unsafe.Pointer) (err error) {
 }
 
 func SetsockoptMfcctl(fd, level, opt int, mfcctl *Mfcctl) error {
+	// #nosec G103 -- unsage pointer is safe from garbage collection as it's
+	// used before `mfcctl` is freed
 	return setsockopt(fd, level, opt, unsafe.Pointer(mfcctl), SizeofMfcctl)
 }
 
 func SetsockoptVifctl(fd, level, opt int, vifctl *Vifctl) error {
+	// #nosec G103 -- unsage pointer is safe from garbage collection as it's
+	// used before `vifctl` is freed
 	return setsockopt(fd, level, opt, unsafe.Pointer(vifctl), SizeofVifctl)
 }
 
 func IoctlGetSiocSgReq(fd int, siocsgreq *SiocSgReq) error {
+	// #nosec G103 -- unsage pointer is safe from garbage collection as it's
+	// used before `siocsgreq` is freed
 	return ioctlPtr(fd, SIOCGETSGCNT, unsafe.Pointer(siocsgreq))
 }

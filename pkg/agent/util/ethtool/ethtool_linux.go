@@ -55,6 +55,9 @@ func EthtoolTXHWCsumOff(name string) error {
 		Data: 0,
 	}
 	request := ifReq{
+		// #nosec G103 -- unsafe pointer is safe against garbage collection because `value`
+		// and `request` are still in use by the time RawSyscall returns
+		// which is where they are last used
 		Data: uintptr(unsafe.Pointer(&value)),
 	}
 	copy(request.Name[:], []byte(name))
@@ -65,6 +68,9 @@ func EthtoolTXHWCsumOff(name string) error {
 		syscall.SYS_IOCTL,
 		uintptr(fd),
 		uintptr(SIOCETHTOOL),
+		// #nosec G103 -- unsafe pointer is safe against garbage collection
+		// because `request` is still in use by the time the unsafe pointer
+		// is last used
 		uintptr(unsafe.Pointer(&request)),
 	); errno != 0 {
 		return fmt.Errorf("ioctl call failed: %v", errno)

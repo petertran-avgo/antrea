@@ -798,6 +798,7 @@ func adapterAddresses() ([]*windows.IpAdapterAddresses, error) {
 	l := uint32(15000) // recommended initial size
 	for {
 		b = make([]byte, l)
+		// #nosec G103 -- unsafe pointer is used appropriately to store addresses
 		err := getAdaptersAddresses(syscall.AF_UNSPEC, flags, 0, (*windows.IpAdapterAddresses)(unsafe.Pointer(&b[0])), &l)
 		if err == nil {
 			if l == 0 {
@@ -813,6 +814,7 @@ func adapterAddresses() ([]*windows.IpAdapterAddresses, error) {
 		}
 	}
 	var aas []*windows.IpAdapterAddresses
+	// #nosec G103 -- unsafe pointer correctly casted (matching the point type in above for loop)
 	for aa := (*windows.IpAdapterAddresses)(unsafe.Pointer(&b[0])); aa != nil; aa = aa.Next {
 		aas = append(aas, aa)
 	}

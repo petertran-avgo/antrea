@@ -262,6 +262,7 @@ func TestListIPForwardRowsSuccess(t *testing.T) {
 	freeMibTableCalled := false
 	testNetIO := &netIO{
 		getIPForwardTable: func(family uint16, ipForwardTable **MibIPForwardTable) (errcode error) {
+			// #nosec G103 -- safe usage casting to *MibIPFowardTable since `table` matches fields and sizes of `MibIPForwardTable`
 			*ipForwardTable = (*MibIPForwardTable)(unsafe.Pointer(&table))
 			return nil
 		},
