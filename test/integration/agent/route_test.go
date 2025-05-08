@@ -462,12 +462,12 @@ func TestSyncRoutes(t *testing.T) {
 		assert.NoError(t, routeClient.AddRoutes(peerCIDR, tc.nodeName, tc.peerIP, nhCIDRIP), "adding routes failed")
 
 		listCmd := fmt.Sprintf("ip route show table 0 exact %s", peerCIDR)
-		expOutput, err := exec.Command("bash", "-c", listCmd).Output() // #nosec G204 -- safe to do in testing
+		expOutput, err := exec.Command("bash", "-c", listCmd).Output()
 		assert.NoError(t, err, "error executing ip route command: %s", listCmd)
 
 		if len(expOutput) > 0 {
 			delCmd := fmt.Sprintf("ip route del %s", peerCIDR.String())
-			_, err = exec.Command("bash", "-c", delCmd).Output() // #nosec G204 -- safe to do in testing
+			_, err = exec.Command("bash", "-c", delCmd).Output()
 			assert.NoError(t, err, "error executing ip route command: %s", delCmd)
 		}
 
@@ -477,7 +477,7 @@ func TestSyncRoutes(t *testing.T) {
 		go routeClient.Run(stopCh)
 		time.Sleep(route.SyncInterval) // wait for one iteration of sync operation.
 
-		output, err := exec.Command("bash", "-c", listCmd).Output() // #nosec G204 -- safe to do in testing
+		output, err := exec.Command("bash", "-c", listCmd).Output()
 		assert.NoError(t, err, "error executing ip route command: %s", listCmd)
 		assert.Equal(t, expOutput, output, "error syncing route")
 	}
@@ -503,7 +503,7 @@ func TestSyncGatewayKernelRoute(t *testing.T) {
 	listCmd := fmt.Sprintf("ip route show table 0 exact %s", podCIDR)
 
 	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (done bool, err error) {
-		expOutput, err := exec.Command("bash", "-c", listCmd).Output() // #nosec G204 -- safe to do in testing
+		expOutput, err := exec.Command("bash", "-c", listCmd).Output()
 		if err != nil {
 			return false, err
 		}
@@ -512,7 +512,7 @@ func TestSyncGatewayKernelRoute(t *testing.T) {
 	require.NoError(t, err, "error when waiting for autoconf'd route")
 
 	delCmd := fmt.Sprintf("ip route del %s", podCIDR)
-	_, err = exec.Command("bash", "-c", delCmd).Output() // #nosec G204 -- safe to do in testing
+	_, err = exec.Command("bash", "-c", delCmd).Output()
 	require.NoError(t, err, "error executing ip route command: %s", delCmd)
 
 	stopCh := make(chan struct{})
@@ -521,7 +521,7 @@ func TestSyncGatewayKernelRoute(t *testing.T) {
 	go routeClient.Run(stopCh)
 
 	err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 2*route.SyncInterval, false, func(ctx context.Context) (done bool, err error) {
-		expOutput, err := exec.Command("bash", "-c", listCmd).Output() // #nosec G204 -- safe to do in testing
+		expOutput, err := exec.Command("bash", "-c", listCmd).Output()
 		if err != nil {
 			return false, err
 		}

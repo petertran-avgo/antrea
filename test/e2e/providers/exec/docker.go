@@ -105,7 +105,7 @@ func RunDockerPsFilterCommand(filter string) (
 	code int, stdout string, stderr string, err error,
 ) {
 	args := []string{"ps", "--filter", filter}
-	dockerCmd := exec.Command("docker", args...) // #nosec G204 -- safe to do in testing
+	dockerCmd := exec.Command("docker", args...)
 	stdoutPipe, err := dockerCmd.StdoutPipe()
 	if err != nil {
 		return 0, "", "", fmt.Errorf("error when connecting to stdout: %v", err)
