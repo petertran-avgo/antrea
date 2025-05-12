@@ -1260,9 +1260,15 @@ func (k *KubernetesUtils) Cleanup(namespaces map[string]TestNamespaceMeta) {
 	}
 
 	for _, ns := range namespaces {
-		log.Infof("Deleting test Namespace %s", ns)
-		if err := k.DeleteNamespace(ns.Name, defaultTimeout); err != nil {
-			log.Errorf("Error when deleting Namespace '%s': %v", ns, err)
-		}
+		k.CleanupNamespace(ns)
+	}
+}
+
+// CleanupNamespace logs a message, deletes the given ns with the defaultTimeout. An error
+// is logged when the deletion fails
+func (k *KubernetesUtils) CleanupNamespace(ns TestNamespaceMeta) {
+	log.Infof("Deleting test Namespace %s", ns)
+	if err := k.DeleteNamespace(ns.Name, defaultTimeout); err != nil {
+		log.Errorf("Error when deleting Namespace '%s': %v", ns, err)
 	}
 }
