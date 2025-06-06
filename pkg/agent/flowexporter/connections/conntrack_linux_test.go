@@ -71,12 +71,13 @@ var (
 
 func TestConnTrackSystem_DumpFlows(t *testing.T) {
 	// Create flows for test
-	tuple := flowexporter.Tuple{SourceAddress: srcAddr, DestinationAddress: dstAddr, Protocol: 6, SourcePort: 65280, DestinationPort: 255}
-	antreaFlow := &flowexporter.Connection{
-		FlowKey: tuple,
-		Zone:    openflow.CtZone,
-	}
-	tuple = flowexporter.Tuple{SourceAddress: srcAddr, DestinationAddress: svcAddr, Protocol: 6, SourcePort: 60001, DestinationPort: 200}
+	//tuple := flowexporter.Tuple{SourceAddress: srcAddr, DestinationAddress: dstAddr, Protocol: 6, SourcePort: 65280, DestinationPort: 255}
+	//antreaFlow := &flowexporter.Connection{
+	//	FlowKey: tuple,
+	//	Zone:    openflow.CtZone,
+	//}
+	antreaFlow := connectionstest.Builder{}.Get()
+	tuple := flowexporter.Tuple{SourceAddress: srcAddr, DestinationAddress: svcAddr, Protocol: 6, SourcePort: 60001, DestinationPort: 200}
 	antreaServiceFlow := &flowexporter.Connection{
 		FlowKey: tuple,
 		Zone:    openflow.CtZone,
