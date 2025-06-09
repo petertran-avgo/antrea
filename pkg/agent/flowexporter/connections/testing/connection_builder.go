@@ -16,6 +16,7 @@ type Builder struct {
 	sourcePort         uint16
 	destinationPort    uint16
 	destinationAddress netip.Addr
+	zone               uint16
 }
 
 func NewBuilder() Builder {
@@ -23,15 +24,11 @@ func NewBuilder() Builder {
 		sourcePort:         60001,
 		destinationPort:    200,
 		destinationAddress: dstAddr,
+		zone:               openflow.CtZone,
 	}
 }
 
 func (b Builder) Get() *flowexporter.Connection {
-	//tuple := flowexporter.Tuple{SourceAddress: srcAddr, DestinationAddress: svcAddr, Protocol: 6, SourcePort: 60001, DestinationPort: 200}
-	//antreaServiceFlow := &flowexporter.Connection{
-	//	FlowKey: tuple,
-	//	Zone:    openflow.CtZone,
-	//}
 	return &flowexporter.Connection{
 		FlowKey: flowexporter.Tuple{
 			SourceAddress:      srcAddr,
@@ -40,7 +37,7 @@ func (b Builder) Get() *flowexporter.Connection {
 			SourcePort:         b.sourcePort,
 			DestinationPort:    b.destinationPort,
 		},
-		Zone: openflow.CtZone,
+		Zone: b.zone,
 	}
 }
 
@@ -56,5 +53,10 @@ func (b Builder) SetDestinationPort(destinationPort uint16) Builder {
 
 func (b Builder) SetDestinationAddress(destinationAddress netip.Addr) Builder {
 	b.destinationAddress = destinationAddress
+	return b
+}
+
+func (b Builder) SetZone(zone uint16) Builder {
+	b.zone = zone
 	return b
 }
