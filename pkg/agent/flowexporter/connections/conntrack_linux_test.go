@@ -73,11 +73,8 @@ func TestConnTrackSystem_DumpFlows(t *testing.T) {
 	// Create flows for test
 	antreaFlow := connectionstest.NewBuilder().SetSourcePort(65280).SetDestinationPort(255).Get()
 	antreaServiceFlow := connectionstest.NewBuilder().SetDestinationAddress(svcAddr).Get()
+	antreaGWFlow := connectionstest.NewBuilder().SetDestinationAddress(gwAddr).Get()
 	tuple := flowexporter.Tuple{SourceAddress: srcAddr, DestinationAddress: gwAddr, Protocol: 6, SourcePort: 60001, DestinationPort: 200}
-	antreaGWFlow := &flowexporter.Connection{
-		FlowKey: tuple,
-		Zone:    openflow.CtZone,
-	}
 	nonAntreaFlow := &flowexporter.Connection{
 		FlowKey: tuple,
 		Zone:    100,
