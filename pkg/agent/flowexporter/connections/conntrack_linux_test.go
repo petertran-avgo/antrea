@@ -77,11 +77,7 @@ func TestConnTrackSystem_DumpFlows(t *testing.T) {
 	nonAntreaFlow := connectionstest.NewBuilder().SetDestinationAddress(gwAddr).SetZone(100).Get()
 	testVarietyFlows := []*flowexporter.Connection{antreaFlow, antreaServiceFlow, antreaGWFlow, nonAntreaFlow}
 	antreaUPDFlow := connectionstest.NewBuilder().SetProtocol(17).Get()
-	tuple := flowexporter.Tuple{SourceAddress: srcAddr, DestinationAddress: netip.MustParseAddr("5.3.2.1"), Protocol: 132, SourcePort: 60001, DestinationPort: 200}
-	antreaSCTPFlow := &flowexporter.Connection{
-		FlowKey: tuple,
-		Zone:    openflow.CtZone,
-	}
+	antreaSCTPFlow := connectionstest.NewBuilder().SetProtocol(132).Get()
 	testFlowsMixedProtocols := []*flowexporter.Connection{antreaFlow, antreaFlow, antreaFlow, antreaUPDFlow, antreaUPDFlow, antreaSCTPFlow}
 
 	// Create nodeConfig and gateWayConfig
