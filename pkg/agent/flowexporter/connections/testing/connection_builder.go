@@ -22,6 +22,7 @@ type Builder struct {
 	protocol                   uint8
 	timeout                    uint32
 	startTime                  time.Time
+	stopTime                   time.Time
 	isPresent                  bool
 	statusFlag                 uint32
 	mark                       uint32
@@ -55,6 +56,7 @@ func (b Builder) Get() *flowexporter.Connection {
 		},
 		Timeout:                    b.timeout,
 		StartTime:                  b.startTime,
+		StopTime:                   b.stopTime,
 		Zone:                       b.zone,
 		IsPresent:                  b.isPresent,
 		StatusFlag:                 b.statusFlag,
@@ -115,6 +117,11 @@ func (b Builder) SetTimeout(timeout uint32) Builder {
 
 func (b Builder) SetStartTime(startTime time.Time) Builder {
 	b.startTime = startTime
+	return b
+}
+
+func (b Builder) SetStopTime(stopTime time.Time) Builder {
+	b.stopTime = stopTime
 	return b
 }
 

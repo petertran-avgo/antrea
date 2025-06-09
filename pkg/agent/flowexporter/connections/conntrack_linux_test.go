@@ -251,7 +251,7 @@ func TestNetLinkFlowToAntreaConnection(t *testing.T) {
 		Timestamp: conntrack.Timestamp{Start: time.Date(2020, 7, 25, 8, 40, 8, 959000000, time.UTC)},
 	}
 
-	expectedAntreaFlow := connectionstest.NewBuilder().
+	builder := connectionstest.NewBuilder().
 		SetSourceAddress(conntrackFlowTuple.IP.SourceAddress).
 		SetDestinationAddress(conntrackFlowTupleReply.IP.SourceAddress).
 		SetProtocol(conntrackFlowTuple.Proto.Protocol).
@@ -268,7 +268,8 @@ func TestNetLinkFlowToAntreaConnection(t *testing.T) {
 		SetOriginalPackets(netlinkFlow.CountersOrig.Packets).
 		SetOriginalBytes(netlinkFlow.CountersOrig.Bytes).
 		SetReversePackets(netlinkFlow.CountersReply.Packets).
-		SetReverseBytes(netlinkFlow.CountersReply.Bytes).Get()
+		SetReverseBytes(netlinkFlow.CountersReply.Bytes)
+	expectedAntreaFlow := builder.Get()
 
 	antreaFlow := NetlinkFlowToAntreaConnection(netlinkFlow)
 	// Just add the stop time directly as it will be set to the time of day at
@@ -285,34 +286,14 @@ func TestNetLinkFlowToAntreaConnection(t *testing.T) {
 			Stop:  time.Date(2020, 7, 25, 8, 45, 10, 959683808, time.UTC),
 		},
 	}
-	tuple := flowexporter.Tuple{
-		SourceAddress:      conntrackFlowTuple.IP.SourceAddress,
-		DestinationAddress: conntrackFlowTupleReply.IP.SourceAddress,
-		Protocol:           conntrackFlowTuple.Proto.Protocol,
-		SourcePort:         conntrackFlowTuple.Proto.SourcePort,
-		DestinationPort:    conntrackFlowTupleReply.Proto.SourcePort,
-	}
-	expectedAntreaFlow = &flowexporter.Connection{
-		Timeout:                    netlinkFlow.Timeout,
-		StartTime:                  netlinkFlow.Timestamp.Start,
-		StopTime:                   netlinkFlow.Timestamp.Stop,
-		IsPresent:                  true,
-		Zone:                       2,
-		StatusFlag:                 0x204,
-		Mark:                       0x1234,
-		FlowKey:                    tuple,
-		OriginalDestinationAddress: conntrackFlowTuple.IP.DestinationAddress,
-		OriginalDestinationPort:    conntrackFlowTuple.Proto.DestinationPort,
-		OriginalPackets:            netlinkFlow.CountersOrig.Packets,
-		OriginalBytes:              netlinkFlow.CountersOrig.Bytes,
-		ReversePackets:             netlinkFlow.CountersReply.Packets,
-		ReverseBytes:               netlinkFlow.CountersReply.Bytes,
-		SourcePodNamespace:         "",
-		SourcePodName:              "",
-		DestinationPodNamespace:    "",
-		DestinationPodName:         "",
-		TCPState:                   "",
-	}
+	expectedAntreaFlow = builder.SetTimeout(netlinkFlow.Timeout).
+		SetStartTime(netlinkFlow.Timestamp.Start).
+		SetStopTime(netlinkFlow.Timestamp.Stop).
+		SetStatusFlag(0x204).
+		SetOriginalPackets(netlinkFlow.CountersOrig.Packets).
+		SetOriginalBytes(netlinkFlow.CountersOrig.Bytes).
+		SetReversePackets(netlinkFlow.CountersReply.Packets).
+		SetReverseBytes(netlinkFlow.CountersReply.Bytes).Get()
 
 	antreaFlow = NetlinkFlowToAntreaConnection(netlinkFlow)
 	assert.Equalf(t, expectedAntreaFlow, antreaFlow, "both flows should be equal")
