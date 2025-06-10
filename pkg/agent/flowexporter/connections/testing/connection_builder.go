@@ -28,6 +28,7 @@ type Builder struct {
 	reversePackets             uint64
 	reverseBytes               uint64
 	id                         uint32
+	tcpState                   string
 }
 
 func NewBuilder() Builder {
@@ -64,6 +65,7 @@ func (b Builder) Get() *flowexporter.Connection {
 		ReversePackets:             b.reversePackets,
 		ReverseBytes:               b.reverseBytes,
 		ID:                         b.id,
+		TCPState:                   b.tcpState,
 	}
 }
 
@@ -156,6 +158,11 @@ func (b Builder) SetReversePackets(packets uint64) Builder {
 
 func (b Builder) SetReverseBytes(bytes uint64) Builder {
 	b.reverseBytes = bytes
+	return b
+}
+
+func (b Builder) SetTCPState(state string) Builder {
+	b.tcpState = state
 	return b
 }
 
