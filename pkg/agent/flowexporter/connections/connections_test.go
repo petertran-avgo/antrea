@@ -62,17 +62,15 @@ func TestConnectionStore_ForAllConnectionsDo(t *testing.T) {
 		SetReverseBytes(0xbaaa).
 		SetPresent().Get()
 	// Flow-2, which is not in connectionStore
-	tuple2 := flowexporter.Tuple{SourceAddress: netip.MustParseAddr("5.6.7.8"), DestinationAddress: netip.MustParseAddr("8.7.6.5"), Protocol: 6, SourcePort: 60001, DestinationPort: 200}
-	testFlows[1] = &flowexporter.Connection{
-		StartTime:       refTime.Add(-(time.Second * 20)),
-		StopTime:        refTime,
-		OriginalPackets: 0xbb,
-		OriginalBytes:   0xcbbb,
-		ReversePackets:  0xbbbb,
-		ReverseBytes:    0xcbbbb0000000000,
-		FlowKey:         tuple2,
-		IsPresent:       true,
-	}
+	testFlows[1] = connectionstest.NewBuilder().SetSourceAddress(netip.MustParseAddr("5.6.7.8")).
+		SetDestinationAddress(netip.MustParseAddr("8.7.6.5")).
+		SetStartTime(refTime.Add(-(time.Second * 20))).
+		SetStopTime(refTime).
+		SetOriginalPackets(0xbb).
+		SetOriginalBytes(0xcbbb).
+		SetReversePackets(0xbbbb).
+		SetReverseBytes(0xcbbbb0000000000).
+		SetPresent().Get()
 	for i, flow := range testFlows {
 		connKey := flowexporter.NewConnectionKey(flow)
 		testFlowKeys[i] = &connKey
