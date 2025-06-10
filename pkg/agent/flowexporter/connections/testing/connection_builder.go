@@ -8,11 +8,6 @@ import (
 	"antrea.io/antrea/pkg/agent/openflow"
 )
 
-var (
-	srcAddr = netip.MustParseAddr("1.2.3.4")
-	dstAddr = netip.MustParseAddr("4.3.2.1")
-)
-
 type Builder struct {
 	sourcePort                 uint16
 	destinationPort            uint16
@@ -38,10 +33,10 @@ func NewBuilder() Builder {
 	return Builder{
 		sourcePort:         60001,
 		destinationPort:    200,
-		destinationAddress: dstAddr,
+		destinationAddress: netip.MustParseAddr("4.3.2.1"),
 		zone:               openflow.CtZone,
 		protocol:           6,
-		sourceAddress:      srcAddr,
+		sourceAddress:      netip.MustParseAddr("1.2.3.4"),
 	}
 }
 
