@@ -103,10 +103,7 @@ func TestConnectionStore_DeleteConnWithoutLock(t *testing.T) {
 	// test on deny connection store
 	mockPodStore := podstoretest.NewMockInterface(ctrl)
 	denyConnStore := NewDenyConnectionStore(mockPodStore, nil, testFlowExporterOptions, filter.NewProtocolFilter(nil))
-	tuple := flowexporter.Tuple{SourceAddress: netip.MustParseAddr("1.2.3.4"), DestinationAddress: netip.MustParseAddr("4.3.2.1"), Protocol: 6, SourcePort: 65280, DestinationPort: 255}
-	conn := &flowexporter.Connection{
-		FlowKey: tuple,
-	}
+	conn := connectionstest.NewBuilder().SetSourcePort(65280).SetDestinationPort(255).Get()
 	connKey := flowexporter.NewConnectionKey(conn)
 	denyConnStore.connections[connKey] = conn
 
