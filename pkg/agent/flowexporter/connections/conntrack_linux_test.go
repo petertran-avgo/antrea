@@ -191,8 +191,8 @@ func TestConnTrackOvsAppCtl_DumpFlows(t *testing.T) {
 		SetReversePackets(381035).
 		SetReverseBytes(181176472).
 		SetID(982464968).
-		SetTCPState("ESTABLISHED").Get()
-	expConn.Labels = []byte{1, 0, 0, 0, 2, 0, 0, 0}
+		SetTCPState("ESTABLISHED").
+		SetLabels([]byte{1, 0, 0, 0, 2, 0, 0, 0}).Get()
 	mockOVSCtlClient.EXPECT().RunAppctlCmd("dpctl/dump-conntrack", false, "-m", "-s").Return(ovsctlCmdOutput, nil)
 
 	conns, totalConns, err := connDumper.DumpFlows(uint16(openflow.CtZone))
