@@ -174,35 +174,25 @@ func TestConnTrackOvsAppCtl_DumpFlows(t *testing.T) {
 		"tcp,orig=(src=127.0.0.1,dst=8.7.6.5,sport=45170,dport=2379,packets=80743,bytes=5416239),reply=(src=8.7.6.5,dst=127.0.0.1,sport=2379,dport=45170,packets=63361,bytes=4811261),start=2020-07-24T05:07:01.591,id=462801621,zone=65520,status=SEEN_REPLY|ASSURED|CONFIRMED|SRC_NAT_DONE|DST_NAT_DONE,timeout=86397,protoinfo=(state_orig=ESTABLISHED,state_reply=ESTABLISHED,wscale_orig=7,wscale_reply=7,flags_orig=WINDOW_SCALE|SACK_PERM|MAXACK_SET,flags_reply=WINDOW_SCALE|SACK_PERM|MAXACK_SET)\n" +
 		"tcp,orig=(src=100.10.0.105,dst=100.50.25.1,sport=41284,dport=443,packets=343260,bytes=19340621),reply=(src=100.10.0.106,dst=100.10.0.105,sport=6443,dport=41284,packets=381035,bytes=181176472),start=2020-07-25T08:40:08.959,id=982464968,zone=65520,status=SEEN_REPLY|ASSURED|CONFIRMED|DST_NAT|DST_NAT_DONE,timeout=86399,labels=0x200000001,mark=16,protoinfo=(state_orig=ESTABLISHED,state_reply=ESTABLISHED,wscale_orig=7,wscale_reply=7,flags_orig=WINDOW_SCALE|SACK_PERM|MAXACK_SET,flags_reply=WINDOW_SCALE|SACK_PERM|MAXACK_SET)")
 	outputFlow := strings.Split(string(ovsctlCmdOutput), "\n")
-	expConn := &flowexporter.Connection{
-		ID:         982464968,
-		Timeout:    86399,
-		StartTime:  time.Date(2020, 7, 25, 8, 40, 8, 959000000, time.UTC),
-		StopTime:   time.Time{},
-		IsPresent:  true,
-		Zone:       65520,
-		StatusFlag: 302,
-		Mark:       openflow.ServiceCTMark.GetValue(),
-		FlowKey: flowexporter.Tuple{
-			SourceAddress:      netip.MustParseAddr("100.10.0.105"),
-			DestinationAddress: netip.MustParseAddr("100.10.0.106"),
-			Protocol:           6,
-			SourcePort:         uint16(41284),
-			DestinationPort:    uint16(6443),
-		},
-		OriginalDestinationAddress: netip.MustParseAddr("100.50.25.1"),
-		OriginalDestinationPort:    uint16(443),
-		OriginalPackets:            343260,
-		OriginalBytes:              19340621,
-		ReversePackets:             381035,
-		ReverseBytes:               181176472,
-		SourcePodNamespace:         "",
-		SourcePodName:              "",
-		DestinationPodNamespace:    "",
-		DestinationPodName:         "",
-		TCPState:                   "ESTABLISHED",
-		Labels:                     []byte{1, 0, 0, 0, 2, 0, 0, 0},
-	}
+	expConn := connectionstest.NewBuilder().SetTimeout(86399).
+		SetStartTime(time.Date(2020, 7, 25, 8, 40, 8, 959000000, time.UTC)).
+		SetPresent().
+		SetZone(65520).
+		SetStatusFlag(302).
+		SetMark(openflow.ServiceCTMark.GetValue()).
+		SetSourceAddress(netip.MustParseAddr("100.10.0.105")).
+		SetDestinationAddress(netip.MustParseAddr("100.10.0.106")).
+		SetSourcePort(uint16(41284)).
+		SetDestinationPort(uint16(6443)).
+		SetOriginalDestinationAddress(netip.MustParseAddr("100.50.25.1")).
+		SetOriginalDestinationPort(uint16(443)).
+		SetOriginalPackets(343260).
+		SetOriginalBytes(19340621).
+		SetReversePackets(381035).
+		SetReverseBytes(181176472).Get()
+	expConn.ID = 982464968
+	expConn.TCPState = "ESTABLISHED"
+	expConn.Labels = []byte{1, 0, 0, 0, 2, 0, 0, 0}
 	mockOVSCtlClient.EXPECT().RunAppctlCmd("dpctl/dump-conntrack", false, "-m", "-s").Return(ovsctlCmdOutput, nil)
 
 	conns, totalConns, err := connDumper.DumpFlows(uint16(openflow.CtZone))
