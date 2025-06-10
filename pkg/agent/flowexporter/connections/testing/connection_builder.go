@@ -27,6 +27,7 @@ type Builder struct {
 	originalBytes              uint64
 	reversePackets             uint64
 	reverseBytes               uint64
+	id                         uint32
 }
 
 func NewBuilder() Builder {
@@ -62,6 +63,7 @@ func (b Builder) Get() *flowexporter.Connection {
 		OriginalBytes:              b.originalBytes,
 		ReversePackets:             b.reversePackets,
 		ReverseBytes:               b.reverseBytes,
+		ID:                         b.id,
 	}
 }
 
@@ -154,5 +156,10 @@ func (b Builder) SetReversePackets(packets uint64) Builder {
 
 func (b Builder) SetReverseBytes(bytes uint64) Builder {
 	b.reverseBytes = bytes
+	return b
+}
+
+func (b Builder) SetID(id uint32) Builder {
+	b.id = id
 	return b
 }

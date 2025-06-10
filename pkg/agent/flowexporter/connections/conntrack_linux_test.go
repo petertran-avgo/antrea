@@ -189,8 +189,8 @@ func TestConnTrackOvsAppCtl_DumpFlows(t *testing.T) {
 		SetOriginalPackets(343260).
 		SetOriginalBytes(19340621).
 		SetReversePackets(381035).
-		SetReverseBytes(181176472).Get()
-	expConn.ID = 982464968
+		SetReverseBytes(181176472).
+		SetID(982464968).Get()
 	expConn.TCPState = "ESTABLISHED"
 	expConn.Labels = []byte{1, 0, 0, 0, 2, 0, 0, 0}
 	mockOVSCtlClient.EXPECT().RunAppctlCmd("dpctl/dump-conntrack", false, "-m", "-s").Return(ovsctlCmdOutput, nil)
