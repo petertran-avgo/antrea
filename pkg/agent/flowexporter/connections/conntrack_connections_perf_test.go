@@ -187,8 +187,7 @@ func generateUpdatedConns(conns []*flowexporter.Connection) []*flowexporter.Conn
 }
 
 func getNewConn() *flowexporter.Connection {
-	randomNum1 := getRandomNum(255)
-	randomNum2 := getRandomNum(255)
+	randomNum := getRandomNum(255)
 	var src, dst, svc netip.Addr
 	if testWithIPv6 {
 		src = exptest.RandIPv6()
@@ -199,21 +198,19 @@ func getNewConn() *flowexporter.Connection {
 		dst = exptest.RandIPv4()
 		svc = svcIPv4
 	}
-	flowKey := flowexporter.Tuple{SourceAddress: src, DestinationAddress: dst, Protocol: 6, SourcePort: uint16(randomNum1), DestinationPort: uint16(randomNum2)}
-	return &flowexporter.Connection{
-		StartTime:                  time.Now().Add(-time.Duration(randomNum1) * time.Second),
-		StopTime:                   time.Now(),
-		IsPresent:                  true,
-		ReadyToDelete:              false,
-		FlowKey:                    flowKey,
-		OriginalPackets:            10,
-		OriginalBytes:              100,
-		ReversePackets:             5,
-		ReverseBytes:               50,
-		OriginalDestinationAddress: svc,
-		OriginalDestinationPort:    30000,
-		TCPState:                   "SYN_SENT",
-	}
+	return connectionstest.NewBuilder().SetSourceAddress(src).SetDestinationAddress(dst).
+		SetSourcePort(uint16(randomNum)).
+		SetDestinationPort(uint16(getRandomNum(255))).
+		SetStartTime(time.Now().Add(-time.Duration(randomNum) * time.Second)).
+		SetStopTime(time.Now()).
+		SetPresent().
+		SetOriginalPackets(10).
+		SetOriginalBytes(100).
+		SetReversePackets(5).
+		SetReverseBytes(50).
+		SetOriginalDestinationAddress(svc).
+		SetOriginalDestinationPort(30000).
+		SetTCPState("SYN_SENT").Get()
 }
 
 func getRandomNum(value int64) uint64 {
