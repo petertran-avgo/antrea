@@ -113,13 +113,10 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 			name:    "addNewConn",
 			flowKey: tuple1,
 			oldConn: nil,
-			newConn: flowexporter.Connection{
-				StartTime: refTime,
-				StopTime:  refTime,
-				FlowKey:   tuple1,
-				Labels:    []byte{0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0},
-				Mark:      openflow.ServiceCTMark.GetValue(),
-			},
+			newConn: *connectionstest.NewBuilder().SetSourceAddress(netip.MustParseAddr("5.6.7.8")).
+				SetDestinationAddress(netip.MustParseAddr("8.7.6.5")).SetStartTime(refTime).
+				SetStopTime(refTime).SetLabels([]byte{0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0}).
+				SetMark(openflow.ServiceCTMark.GetValue()).SetZone(0).Get(),
 			expectedConn: flowexporter.Connection{
 				StartTime:                      refTime,
 				StopTime:                       refTime,
