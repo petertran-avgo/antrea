@@ -9,27 +9,37 @@ import (
 )
 
 type Builder struct {
-	sourcePort                 uint16
-	destinationPort            uint16
-	destinationAddress         netip.Addr
-	sourceAddress              netip.Addr
-	zone                       uint16
-	protocol                   uint8
-	timeout                    uint32
-	startTime                  time.Time
-	stopTime                   time.Time
-	isPresent                  bool
-	statusFlag                 uint32
-	mark                       uint32
-	originalDestinationAddress netip.Addr
-	originalDestinationPort    uint16
-	originalPackets            uint64
-	originalBytes              uint64
-	reversePackets             uint64
-	reverseBytes               uint64
-	id                         uint32
-	tcpState                   string
-	labels                     []byte
+	sourcePort                     uint16
+	destinationPort                uint16
+	destinationAddress             netip.Addr
+	destinationPodName             string
+	destinationPodNamespace        string
+	sourceAddress                  netip.Addr
+	zone                           uint16
+	protocol                       uint8
+	timeout                        uint32
+	startTime                      time.Time
+	stopTime                       time.Time
+	present                        bool
+	statusFlag                     uint32
+	mark                           uint32
+	originalDestinationAddress     netip.Addr
+	originalDestinationPort        uint16
+	originalPackets                uint64
+	originalBytes                  uint64
+	reversePackets                 uint64
+	reverseBytes                   uint64
+	id                             uint32
+	tcpState                       string
+	labels                         []byte
+	lastExportTime                 time.Time
+	active                         bool
+	destinationServicePortName     string
+	ingressNetworkPolicyName       string
+	ingressNetworkPolicyNamespace  string
+	ingressNetworkPolicyType       uint8
+	ingressNetworkPolicyRuleName   string
+	ingressNetworkPolicyRuleAction uint8
 }
 
 func NewBuilder() Builder {
@@ -52,22 +62,32 @@ func (b Builder) Get() *flowexporter.Connection {
 			SourcePort:         b.sourcePort,
 			DestinationPort:    b.destinationPort,
 		},
-		Timeout:                    b.timeout,
-		StartTime:                  b.startTime,
-		StopTime:                   b.stopTime,
-		Zone:                       b.zone,
-		IsPresent:                  b.isPresent,
-		StatusFlag:                 b.statusFlag,
-		Mark:                       b.mark,
-		OriginalDestinationAddress: b.originalDestinationAddress,
-		OriginalDestinationPort:    b.originalDestinationPort,
-		OriginalPackets:            b.originalPackets,
-		OriginalBytes:              b.originalBytes,
-		ReversePackets:             b.reversePackets,
-		ReverseBytes:               b.reverseBytes,
-		ID:                         b.id,
-		TCPState:                   b.tcpState,
-		Labels:                     b.labels,
+		Timeout:                        b.timeout,
+		StartTime:                      b.startTime,
+		StopTime:                       b.stopTime,
+		Zone:                           b.zone,
+		IsPresent:                      b.present,
+		StatusFlag:                     b.statusFlag,
+		Mark:                           b.mark,
+		OriginalDestinationAddress:     b.originalDestinationAddress,
+		OriginalDestinationPort:        b.originalDestinationPort,
+		OriginalPackets:                b.originalPackets,
+		OriginalBytes:                  b.originalBytes,
+		ReversePackets:                 b.reversePackets,
+		ReverseBytes:                   b.reverseBytes,
+		ID:                             b.id,
+		TCPState:                       b.tcpState,
+		Labels:                         b.labels,
+		LastExportTime:                 b.lastExportTime,
+		IsActive:                       b.active,
+		DestinationServicePortName:     b.destinationServicePortName,
+		IngressNetworkPolicyName:       b.ingressNetworkPolicyName,
+		IngressNetworkPolicyNamespace:  b.ingressNetworkPolicyNamespace,
+		IngressNetworkPolicyType:       b.ingressNetworkPolicyType,
+		IngressNetworkPolicyRuleName:   b.ingressNetworkPolicyRuleName,
+		IngressNetworkPolicyRuleAction: b.ingressNetworkPolicyRuleAction,
+		DestinationPodName:             b.destinationPodName,
+		DestinationPodNamespace:        b.destinationPodNamespace,
 	}
 }
 
@@ -127,7 +147,7 @@ func (b Builder) SetStopTime(stopTime time.Time) Builder {
 }
 
 func (b Builder) SetPresent() Builder {
-	b.isPresent = true
+	b.present = true
 	return b
 }
 
@@ -175,5 +195,55 @@ func (b Builder) SetID(id uint32) Builder {
 
 func (b Builder) SetLabels(labels []byte) Builder {
 	b.labels = labels
+	return b
+}
+
+func (b Builder) SetLastExportTime(time time.Time) Builder {
+	b.lastExportTime = time
+	return b
+}
+
+func (b Builder) SetActive() Builder {
+	b.active = true
+	return b
+}
+
+func (b Builder) SetDestinationServicePortName(name string) Builder {
+	b.destinationServicePortName = name
+	return b
+}
+
+func (b Builder) SetIngressNetworkPolicyName(name string) Builder {
+	b.ingressNetworkPolicyName = name
+	return b
+}
+
+func (b Builder) SetIngressNetworkPolicyNamespace(namespace string) Builder {
+	b.ingressNetworkPolicyNamespace = namespace
+	return b
+}
+
+func (b Builder) SetIngressNetworkPolicyType(policyType uint8) Builder {
+	b.ingressNetworkPolicyType = policyType
+	return b
+}
+
+func (b Builder) SetIngressNetworkPolicyRuleName(name string) Builder {
+	b.ingressNetworkPolicyRuleName = name
+	return b
+}
+
+func (b Builder) SetIngressNetworkPolicyRuleAction(action uint8) Builder {
+	b.ingressNetworkPolicyRuleAction = action
+	return b
+}
+
+func (b Builder) SetDestinationPodName(name string) Builder {
+	b.destinationPodName = name
+	return b
+}
+
+func (b Builder) SetDestinationPodNamespace(namespace string) Builder {
+	b.destinationPodNamespace = namespace
 	return b
 }

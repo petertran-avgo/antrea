@@ -42,7 +42,6 @@ import (
 )
 
 var (
-	tuple1 = flowexporter.Tuple{SourceAddress: netip.MustParseAddr("5.6.7.8"), DestinationAddress: netip.MustParseAddr("8.7.6.5"), Protocol: 6, SourcePort: 60001, DestinationPort: 200}
 	tuple2 = flowexporter.Tuple{SourceAddress: netip.MustParseAddr("1.2.3.4"), DestinationAddress: netip.MustParseAddr("4.3.2.1"), Protocol: 6, SourcePort: 65280, DestinationPort: 255}
 	tuple3 = flowexporter.Tuple{SourceAddress: netip.MustParseAddr("10.10.10.10"), DestinationAddress: netip.MustParseAddr("4.3.2.1"), Protocol: 6, SourcePort: 60000, DestinationPort: 100}
 	pod1   = &v1.Pod{
@@ -102,43 +101,29 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	refTime := time.Now()
 
+	builder1 := connectionstest.NewBuilder().SetSourceAddress(netip.MustParseAddr("5.6.7.8")).
+		SetDestinationAddress(netip.MustParseAddr("8.7.6.5")).SetStartTime(refTime).
+		SetStopTime(refTime).SetLabels([]byte{0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0}).
+		SetMark(openflow.ServiceCTMark.GetValue()).SetZone(0)
+
 	tc := []struct {
 		name         string
-		flowKey      flowexporter.Tuple
 		oldConn      *flowexporter.Connection
 		newConn      flowexporter.Connection
 		expectedConn flowexporter.Connection
 	}{
 		{
 			name:    "addNewConn",
-			flowKey: tuple1,
 			oldConn: nil,
-			newConn: *connectionstest.NewBuilder().SetSourceAddress(netip.MustParseAddr("5.6.7.8")).
-				SetDestinationAddress(netip.MustParseAddr("8.7.6.5")).SetStartTime(refTime).
-				SetStopTime(refTime).SetLabels([]byte{0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0}).
-				SetMark(openflow.ServiceCTMark.GetValue()).SetZone(0).Get(),
-			expectedConn: flowexporter.Connection{
-				StartTime:                      refTime,
-				StopTime:                       refTime,
-				LastExportTime:                 refTime,
-				FlowKey:                        tuple1,
-				Labels:                         []byte{0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0},
-				Mark:                           openflow.ServiceCTMark.GetValue(),
-				IsPresent:                      true,
-				IsActive:                       true,
-				DestinationPodName:             "pod1",
-				DestinationPodNamespace:        "ns1",
-				DestinationServicePortName:     servicePortName.String(),
-				IngressNetworkPolicyName:       np1.Name,
-				IngressNetworkPolicyNamespace:  np1.Namespace,
-				IngressNetworkPolicyType:       flowexporter.PolicyTypeToUint8(np1.Type),
-				IngressNetworkPolicyRuleName:   rule1.Name,
-				IngressNetworkPolicyRuleAction: flowexporter.RuleActionToUint8(string(*rule1.Action)),
-			},
+			newConn: *builder1.Get(),
+			expectedConn: *builder1.SetLastExportTime(refTime).SetPresent().SetActive().SetDestinationPodName("pod1").
+				SetDestinationPodNamespace("ns1").SetDestinationServicePortName(servicePortName.String()).
+				SetIngressNetworkPolicyName(np1.Name).SetIngressNetworkPolicyName(np1.Name).
+				SetIngressNetworkPolicyNamespace(np1.Namespace).SetIngressNetworkPolicyType(flowexporter.PolicyTypeToUint8(np1.Type)).
+				SetIngressNetworkPolicyRuleName(rule1.Name).SetIngressNetworkPolicyRuleAction(flowexporter.RuleActionToUint8(string(*rule1.Action))).Get(),
 		},
 		{
-			name:    "updateActiveConn",
-			flowKey: tuple2,
+			name: "updateActiveConn",
 			oldConn: &flowexporter.Connection{
 				StartTime:       refTime.Add(-(time.Second * 50)),
 				StopTime:        refTime.Add(-(time.Second * 30)),
@@ -176,8 +161,7 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 		{
 			// If the polled new connection is dying, the old connection present
 			// in connection store will not be updated.
-			name:    "updateDyingConn",
-			flowKey: tuple3,
+			name: "updateDyingConn",
 			oldConn: &flowexporter.Connection{
 				StartTime:       refTime.Add(-(time.Second * 50)),
 				StopTime:        refTime.Add(-(time.Second * 30)),
