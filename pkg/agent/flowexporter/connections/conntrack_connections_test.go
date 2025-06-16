@@ -42,7 +42,6 @@ import (
 )
 
 var (
-	tuple2 = flowexporter.Tuple{SourceAddress: netip.MustParseAddr("1.2.3.4"), DestinationAddress: netip.MustParseAddr("4.3.2.1"), Protocol: 6, SourcePort: 65280, DestinationPort: 255}
 	tuple3 = flowexporter.Tuple{SourceAddress: netip.MustParseAddr("10.10.10.10"), DestinationAddress: netip.MustParseAddr("4.3.2.1"), Protocol: 6, SourcePort: 60000, DestinationPort: 100}
 	pod1   = &v1.Pod{
 		Status: v1.PodStatus{
@@ -105,6 +104,8 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 		SetDestinationAddress(netip.MustParseAddr("8.7.6.5")).SetStartTime(refTime).
 		SetStopTime(refTime).SetLabels([]byte{0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0}).
 		SetMark(openflow.ServiceCTMark.GetValue()).SetZone(0)
+	builder2 := connectionstest.NewBuilder().SetSourcePort(65280).SetDestinationPort(255).SetZone(0).
+		SetStartTime(refTime.Add(-(time.Second * 50))).SetPresent()
 
 	tc := []struct {
 		name         string
@@ -124,39 +125,25 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 		},
 		{
 			name: "updateActiveConn",
-			oldConn: &flowexporter.Connection{
-				StartTime:       refTime.Add(-(time.Second * 50)),
-				StopTime:        refTime.Add(-(time.Second * 30)),
-				LastExportTime:  refTime.Add(-(time.Second * 50)),
-				OriginalPackets: 0xfff,
-				OriginalBytes:   0xbaaaaa00000000,
-				ReversePackets:  0xf,
-				ReverseBytes:    0xbaa,
-				FlowKey:         tuple2,
-				IsPresent:       true,
-			},
-			newConn: flowexporter.Connection{
-				StartTime:       refTime.Add(-(time.Second * 50)),
-				StopTime:        refTime,
-				OriginalPackets: 0xffff,
-				OriginalBytes:   0xbaaaaa0000000000,
-				ReversePackets:  0xff,
-				ReverseBytes:    0xbaaa,
-				FlowKey:         tuple2,
-				IsPresent:       true,
-			},
-			expectedConn: flowexporter.Connection{
-				StartTime:       refTime.Add(-(time.Second * 50)),
-				StopTime:        refTime,
-				LastExportTime:  refTime.Add(-(time.Second * 50)),
-				OriginalPackets: 0xffff,
-				OriginalBytes:   0xbaaaaa0000000000,
-				ReversePackets:  0xff,
-				ReverseBytes:    0xbaaa,
-				FlowKey:         tuple2,
-				IsPresent:       true,
-				IsActive:        true,
-			},
+			oldConn: builder2.SetStopTime(refTime.Add(-(time.Second * 30))).
+				SetLastExportTime(refTime.Add(-(time.Second * 50))).
+				SetOriginalPackets(0xfff).
+				SetOriginalBytes(0xbaaaaa00000000).
+				SetReversePackets(0xf).
+				SetReverseBytes(0xbaa).Get(),
+			newConn: *builder2.SetStopTime(refTime).
+				SetLastExportTime(time.Time{}).
+				SetOriginalPackets(0xffff).
+				SetOriginalBytes(0xbaaaaa0000000000).
+				SetReversePackets(0xff).
+				SetReverseBytes(0xbaaa).Get(),
+			expectedConn: *builder2.SetStopTime(refTime).
+				SetLastExportTime(refTime.Add(-(time.Second * 50))).
+				SetOriginalPackets(0xffff).
+				SetOriginalBytes(0xbaaaaa0000000000).
+				SetReversePackets(0xff).
+				SetReverseBytes(0xbaaa).
+				SetActive().Get(),
 		},
 		{
 			// If the polled new connection is dying, the old connection present

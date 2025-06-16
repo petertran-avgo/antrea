@@ -163,13 +163,11 @@ func (b Builder) SetMark(mark uint32) Builder {
 
 func (b Builder) SetOriginalPackets(packets uint64) Builder {
 	b.originalPackets = packets
-
 	return b
 }
 
 func (b Builder) SetOriginalBytes(bytes uint64) Builder {
 	b.originalBytes = bytes
-
 	return b
 }
 
