@@ -150,6 +150,8 @@ type selectorItem struct {
 	groupItemKeys sets.Set[string]
 	// The keys of the labelItems that match the selectorItem.
 	labelItemKeys sets.Set[string]
+	// The keys of the entityItem that match the selectorItem for NodeSelector only.
+	entityItemKeys sets.Set[string]
 }
 
 var _ Interface = &GroupEntityIndex{}
@@ -191,6 +193,9 @@ type GroupEntityIndex struct {
 	// namespaceLabels stores label sets of all Namespaces.
 	namespaceLabels map[string]labels.Set
 
+	// nodeLabels stores label sets of all nodes
+	nodeLabels map[string]labels.Set
+
 	// eventHandlers is a map from group type to a list of handlers. When a type of group's updated, the corresponding
 	// event handlers will be called with the group name provided.
 	eventHandlers map[GroupType][]eventHandler
@@ -215,6 +220,7 @@ func NewGroupEntityIndex() *GroupEntityIndex {
 		selectorItems:     map[string]*selectorItem{},
 		selectorItemIndex: map[entityType]map[string]sets.Set[string]{podEntityType: {}, externalEntityType: {}},
 		namespaceLabels:   map[string]labels.Set{},
+		nodeLabels:        map[string]labels.Set{},
 		eventHandlers:     map[GroupType][]eventHandler{},
 		eventChan:         make(chan string, eventChanSize),
 		synced:            synced,
@@ -251,6 +257,15 @@ func (i *GroupEntityIndex) GetEntities(groupType GroupType, name string) ([]*v1.
 			}
 		}
 	}
+	for entityItemKey := range sItem.entityItemKeys {
+		eItem, _ := i.entityItems[entityItemKey]
+		switch entity := eItem.entity.(type) {
+		case *v1.Pod:
+			pods = append(pods, entity)
+		}
+	}
+	// labelItemKeys cannot hold information about pods who's node matches a group's nodeselector label
+	//TODO if this group has node selector, grab it's pods instead
 	return pods, externalEntities
 }
 
@@ -326,6 +341,19 @@ func (i *GroupEntityIndex) AddNamespace(namespace *v1.Namespace) {
 			}
 		}
 	}
+}
+
+func (i *GroupEntityIndex) AddNode(node *v1.Node) {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
+	nodeLabels, exists := i.nodeLabels[node.Name]
+	// Do nothing if labels are not updated.
+	if exists && labels.Equals(nodeLabels, node.Labels) {
+		return
+	}
+
+	i.nodeLabels[node.Name] = node.Labels
 }
 
 func (i *GroupEntityIndex) DeleteNamespace(namespace *v1.Namespace) {
@@ -539,10 +567,12 @@ func (i *GroupEntityIndex) deleteGroupFromSelectorItem(sKey, gKey string) *selec
 // createSelectorItem creates a selectorItem based on the provided groupItem.
 // It's called when there is no existing selectorItem for a group selector.
 func (i *GroupEntityIndex) createSelectorItem(gItem *groupItem) *selectorItem {
+	fmt.Println("\t\tqq:createSelectorItem called for group=", gItem.selector)
 	sItem := &selectorItem{
-		selector:      gItem.selector,
-		groupItemKeys: sets.New[string](),
-		labelItemKeys: sets.New[string](),
+		selector:       gItem.selector,
+		groupItemKeys:  sets.New[string](),
+		labelItemKeys:  sets.New[string](),
+		entityItemKeys: sets.New[string](),
 	}
 	// Create the selectorItem.
 	i.selectorItems[gItem.selectorItemKey] = sItem
@@ -571,9 +601,38 @@ func (i *GroupEntityIndex) createSelectorItem(gItem *groupItem) *selectorItem {
 				i.scanLabelItems(i.labelItemIndex[entityType][namespace], sItem)
 			}
 		}
+	} else if sItem.selector.NodeSelector != nil {
+		// save the pods who's labels match this nodeSelector's labels
+
+		// loop through the entities
+		for entityItemKey, entityItem := range i.entityItems {
+			// if the entity is a pod
+			switch entityItem.entity.(type) {
+			case *v1.Pod:
+				// pod's labels matches
+				pod := entityItem.entity.(*v1.Pod)
+				nodeName := pod.Spec.NodeName
+				nodeLabels, exists := i.nodeLabels[nodeName]
+				if !exists {
+					continue
+				}
+
+				if sItem.selector.NodeSelector.Matches(nodeLabels) {
+					fmt.Println("qq99: savings entity to entityItemKeys of this selector because where was a match")
+					fmt.Println("qq99: nodeLabels=", nodeLabels)
+					fmt.Println("qq99: nodeSelector=", sItem.selector.NodeSelector)
+					fmt.Println("qq99: podname=", pod.Name)
+					sItem.entityItemKeys.Insert(entityItemKey)
+				}
+			}
+		}
+
 	} else {
+		fmt.Println("\t\tqq: cluster scoped groupitem for group=", gItem.selector)
 		// The selector is Cluster scoped and match all Namespaces.
+		fmt.Println("\t\t\tqq: these are the labelItemIndex for entityType=", entityType)
 		for _, labelItemKeys := range i.labelItemIndex[entityType] {
+			fmt.Println(labelItemKeys)
 			i.scanLabelItems(labelItemKeys, sItem)
 		}
 	}
