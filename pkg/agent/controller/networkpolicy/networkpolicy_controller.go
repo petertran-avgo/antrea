@@ -211,15 +211,18 @@ func NewNetworkPolicyController(antreaClientGetter client.AntreaClientProvider,
 		nodeType:                 nodeType,
 		antreaPolicyEnabled:      antreaPolicyEnabled,
 		l7NetworkPolicyEnabled:   l7NetworkPolicyEnabled,
-		nodeNetworkPolicyEnabled: nodeNetworkPolicyEnabled,
-		antreaProxyEnabled:       antreaProxyEnabled,
-		statusManagerEnabled:     statusManagerEnabled,
-		multicastEnabled:         multicastEnabled,
-		gwPort:                   gwPort,
-		tunPort:                  tunPort,
-		nodeConfig:               nodeConfig,
-		podNetworkWait:           podNetworkWait.Increment(),
+		nodeNetworkPolicyEnabled: true,
+		//nodeNetworkPolicyEnabled: nodeNetworkPolicyEnabled,
+		antreaProxyEnabled:   antreaProxyEnabled,
+		statusManagerEnabled: statusManagerEnabled,
+		multicastEnabled:     multicastEnabled,
+		gwPort:               gwPort,
+		tunPort:              tunPort,
+		nodeConfig:           nodeConfig,
+		podNetworkWait:       podNetworkWait.Increment(),
 	}
+
+	klog.Info("new networkpolicycontroller created qq")
 
 	if l7NetworkPolicyEnabled {
 		c.l7RuleReconciler = l7Reconciler
