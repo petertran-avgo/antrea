@@ -107,6 +107,8 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 	builder2 := connectionstest.NewBuilder().SetSourcePort(65280).SetDestinationPort(255).SetZone(0).
 		SetStartTime(refTime.Add(-(time.Second * 50))).SetStopTime(refTime).SetPresent().
 		SetLastExportTime(refTime.Add(-(time.Second * 50))).SetReversePackets(0xff)
+	builder3 := connectionstest.NewBuilder().SetSourceAddress(netip.MustParseAddr("10.10.10.10")).SetDestinationAddress(netip.MustParseAddr("4.3.2.1")).SetProtocol(6).SetSourcePort(60000).SetDestinationPort(100).SetZone(0).
+		SetStartTime(refTime.Add(-(time.Second * 50))).SetStopTime(refTime.Add(-(time.Second * 30))).SetLastExportTime(refTime.Add(-(time.Second * 50))).SetOriginalBytes(0xbaaaaa00000000).SetTCPState("TIME_WAIT").SetPresent()
 	tc := []struct {
 		name         string
 		oldConn      *flowexporter.Connection
@@ -143,25 +145,17 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 			// If the polled new connection is dying, the old connection present
 			// in connection store will not be updated.
 			name: "updateDyingConn",
-			oldConn: &flowexporter.Connection{
-				StartTime:       refTime.Add(-(time.Second * 50)),
-				StopTime:        refTime.Add(-(time.Second * 30)),
-				LastExportTime:  refTime.Add(-(time.Second * 50)),
-				OriginalPackets: 0xfff,
-				OriginalBytes:   0xbaaaaa00000000,
-				ReversePackets:  0xf,
-				ReverseBytes:    0xba,
-				FlowKey:         tuple3,
-				TCPState:        "TIME_WAIT",
-				IsPresent:       true,
-			},
+			oldConn: builder3.SetOriginalPackets(0xfff).
+				SetReversePackets(0xf).
+				SetReverseBytes(0xba).Get(),
 			newConn: flowexporter.Connection{
+				//keep SetLastExportTime(time.Time{}).
 				StartTime:       refTime.Add(-(time.Second * 50)),
-				StopTime:        refTime,
+				StopTime:        refTime, // keep
 				OriginalPackets: 0xffff,
-				OriginalBytes:   0xbaaaaa0000000000,
-				ReversePackets:  0xff,
-				ReverseBytes:    0xbaaa,
+				OriginalBytes:   0xbaaaaa0000000000, // keep
+				ReversePackets:  0xff,               // keep
+				ReverseBytes:    0xbaaa,             // keep
 				FlowKey:         tuple3,
 				TCPState:        "TIME_WAIT",
 				IsPresent:       true,
@@ -172,8 +166,8 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 				LastExportTime:  refTime.Add(-(time.Second * 50)),
 				OriginalPackets: 0xfff,
 				OriginalBytes:   0xbaaaaa00000000,
-				ReversePackets:  0xf,
-				ReverseBytes:    0xba,
+				ReversePackets:  0xf,  // keep
+				ReverseBytes:    0xba, // keep
 				FlowKey:         tuple3,
 				TCPState:        "TIME_WAIT",
 				IsPresent:       true,
