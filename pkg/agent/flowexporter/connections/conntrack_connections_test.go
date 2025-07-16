@@ -105,8 +105,8 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 		SetStopTime(refTime).SetLabels([]byte{0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0}).
 		SetMark(openflow.ServiceCTMark.GetValue()).SetZone(0)
 	builder2 := connectionstest.NewBuilder().SetSourcePort(65280).SetDestinationPort(255).SetZone(0).
-		SetStartTime(refTime.Add(-(time.Second * 50))).SetPresent()
-
+		SetStartTime(refTime.Add(-(time.Second * 50))).SetPresent().
+		SetLastExportTime(refTime.Add(-(time.Second * 50)))
 	tc := []struct {
 		name         string
 		oldConn      *flowexporter.Connection
@@ -126,7 +126,6 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 		{
 			name: "updateActiveConn",
 			oldConn: builder2.SetStopTime(refTime.Add(-(time.Second * 30))).
-				SetLastExportTime(refTime.Add(-(time.Second * 50))).
 				SetOriginalPackets(0xfff).
 				SetOriginalBytes(0xbaaaaa00000000).
 				SetReversePackets(0xf).
@@ -138,7 +137,6 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 				SetReversePackets(0xff).
 				SetReverseBytes(0xbaaa).Get(),
 			expectedConn: *builder2.SetStopTime(refTime).
-				SetLastExportTime(refTime.Add(-(time.Second * 50))).
 				SetOriginalPackets(0xffff).
 				SetOriginalBytes(0xbaaaaa0000000000).
 				SetReversePackets(0xff).
