@@ -42,8 +42,7 @@ import (
 )
 
 var (
-	tuple3 = flowexporter.Tuple{SourceAddress: netip.MustParseAddr("10.10.10.10"), DestinationAddress: netip.MustParseAddr("4.3.2.1"), Protocol: 6, SourcePort: 60000, DestinationPort: 100}
-	pod1   = &v1.Pod{
+	pod1 = &v1.Pod{
 		Status: v1.PodStatus{
 			PodIPs: []v1.PodIP{
 				{
@@ -107,8 +106,11 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 	builder2 := connectionstest.NewBuilder().SetSourcePort(65280).SetDestinationPort(255).SetZone(0).
 		SetStartTime(refTime.Add(-(time.Second * 50))).SetStopTime(refTime).SetPresent().
 		SetLastExportTime(refTime.Add(-(time.Second * 50))).SetReversePackets(0xff)
-	builder3 := connectionstest.NewBuilder().SetSourceAddress(netip.MustParseAddr("10.10.10.10")).SetDestinationAddress(netip.MustParseAddr("4.3.2.1")).SetProtocol(6).SetSourcePort(60000).SetDestinationPort(100).SetZone(0).
-		SetStartTime(refTime.Add(-(time.Second * 50))).SetStopTime(refTime.Add(-(time.Second * 30))).SetLastExportTime(refTime.Add(-(time.Second * 50))).SetOriginalBytes(0xbaaaaa00000000).SetTCPState("TIME_WAIT").SetPresent()
+	builder3 := connectionstest.NewBuilder().SetSourceAddress(netip.MustParseAddr("10.10.10.10")).
+		SetDestinationAddress(netip.MustParseAddr("4.3.2.1")).SetProtocol(6).SetSourcePort(60000).
+		SetDestinationPort(100).SetZone(0).SetStartTime(refTime.Add(-(time.Second * 50))).
+		SetStopTime(refTime.Add(-(time.Second * 30))).SetLastExportTime(refTime.Add(-(time.Second * 50))).
+		SetOriginalBytes(0xbaaaaa00000000).SetTCPState("TIME_WAIT").SetPresent()
 	tc := []struct {
 		name         string
 		oldConn      *flowexporter.Connection
@@ -153,18 +155,9 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 				SetOriginalBytes(0xbaaaaa0000000000).
 				SetReversePackets(0xff).
 				Get(),
-			expectedConn: flowexporter.Connection{
-				StartTime:       refTime.Add(-(time.Second * 50)),
-				StopTime:        refTime.Add(-(time.Second * 30)),
-				LastExportTime:  refTime.Add(-(time.Second * 50)),
-				OriginalPackets: 0xfff,
-				OriginalBytes:   0xbaaaaa00000000,
-				ReversePackets:  0xf,  // keep
-				ReverseBytes:    0xba, // keep
-				FlowKey:         tuple3,
-				TCPState:        "TIME_WAIT",
-				IsPresent:       true,
-			},
+			expectedConn: *builder3.SetOriginalPackets(0xfff).
+				SetReversePackets(0xf).
+				SetReverseBytes(0xba).Get(),
 		},
 	}
 
