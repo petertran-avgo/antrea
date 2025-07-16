@@ -215,28 +215,28 @@ func TestConnectionStore_DeleteConnectionByKey(t *testing.T) {
 	testFlowKeys := make([]*flowexporter.ConnectionKey, 2)
 	refTime := time.Now()
 	// Flow-1, which is already in connectionStore
-	tuple1 := flowexporter.Tuple{SourceAddress: netip.MustParseAddr("1.2.3.4"), DestinationAddress: netip.MustParseAddr("4.3.2.1"), Protocol: 6, SourcePort: 65280, DestinationPort: 255}
-	testFlows[0] = &flowexporter.Connection{
-		StartTime:       refTime.Add(-(time.Second * 50)),
-		StopTime:        refTime,
-		OriginalPackets: 0xffff,
-		OriginalBytes:   0xbaaaaa0000000000,
-		ReversePackets:  0xff,
-		ReverseBytes:    0xbaaa,
-		FlowKey:         tuple1,
-		IsPresent:       true,
-	}
+	builder := connectionstest.NewBuilder().SetProtocol(6).SetStopTime(refTime).SetPresent()
+	testFlows[0] = builder.SetSourceAddress(netip.MustParseAddr("1.2.3.4")).
+		SetDestinationAddress(netip.MustParseAddr("4.3.2.1")).
+		SetSourcePort(65280).
+		SetDestinationPort(255).
+		SetStartTime(refTime.Add(-(time.Second * 50))).
+		SetOriginalPackets(0xffff).
+		SetOriginalBytes(0xbaaaaa0000000000).
+		SetReversePackets(0xff).
+		SetReverseBytes(0xbaaa).
+		Get()
 	// Flow-2, which is not in connectionStore
 	tuple2 := flowexporter.Tuple{SourceAddress: netip.MustParseAddr("5.6.7.8"), DestinationAddress: netip.MustParseAddr("8.7.6.5"), Protocol: 6, SourcePort: 60001, DestinationPort: 200}
 	testFlows[1] = &flowexporter.Connection{
-		StartTime:       refTime.Add(-(time.Second * 20)),
-		StopTime:        refTime,
-		OriginalPackets: 0xbb,
-		OriginalBytes:   0xcbbb,
-		ReversePackets:  0xbbbb,
-		ReverseBytes:    0xcbbbb0000000000,
+		StartTime:       refTime.Add(-(time.Second * 20)), // keep
+		StopTime:        refTime,                          //drop
+		OriginalPackets: 0xbb,                             // keep
+		OriginalBytes:   0xcbbb,                           //keep
+		ReversePackets:  0xbbbb,                           // keep
+		ReverseBytes:    0xcbbbb0000000000,                //keep
 		FlowKey:         tuple2,
-		IsPresent:       true,
+		IsPresent:       true, //drop
 	}
 	for i, flow := range testFlows {
 		connKey := flowexporter.NewConnectionKey(flow)
