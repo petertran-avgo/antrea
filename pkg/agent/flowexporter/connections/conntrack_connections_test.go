@@ -224,20 +224,17 @@ func TestConnectionStore_DeleteConnectionByKey(t *testing.T) {
 		SetOriginalPackets(0xffff).
 		SetOriginalBytes(0xbaaaaa0000000000).
 		SetReversePackets(0xff).
-		SetReverseBytes(0xbaaa).
-		Get()
+		SetReverseBytes(0xbaaa).Get()
 	// Flow-2, which is not in connectionStore
-	tuple2 := flowexporter.Tuple{SourceAddress: netip.MustParseAddr("5.6.7.8"), DestinationAddress: netip.MustParseAddr("8.7.6.5"), Protocol: 6, SourcePort: 60001, DestinationPort: 200}
-	testFlows[1] = &flowexporter.Connection{
-		StartTime:       refTime.Add(-(time.Second * 20)), // keep
-		StopTime:        refTime,                          //drop
-		OriginalPackets: 0xbb,                             // keep
-		OriginalBytes:   0xcbbb,                           //keep
-		ReversePackets:  0xbbbb,                           // keep
-		ReverseBytes:    0xcbbbb0000000000,                //keep
-		FlowKey:         tuple2,
-		IsPresent:       true, //drop
-	}
+	testFlows[1] = builder.SetSourceAddress(netip.MustParseAddr("5.6.7.8")).
+		SetDestinationAddress(netip.MustParseAddr("8.7.6.5")).
+		SetSourcePort(60001).
+		SetDestinationPort(200).
+		SetStartTime(refTime.Add(-(time.Second * 20))).
+		SetOriginalPackets(0xbb).
+		SetOriginalBytes(0xcbbb).
+		SetReversePackets(0xbbbb).
+		SetReverseBytes(0xcbbbb0000000000).Get()
 	for i, flow := range testFlows {
 		connKey := flowexporter.NewConnectionKey(flow)
 		testFlowKeys[i] = &connKey
