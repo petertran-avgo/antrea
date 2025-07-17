@@ -27,6 +27,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"antrea.io/antrea/pkg/agent/flowexporter"
+	connectionstest "antrea.io/antrea/pkg/agent/flowexporter/connections/testing"
 	"antrea.io/antrea/pkg/agent/openflow"
 	binding "antrea.io/antrea/pkg/ovs/openflow"
 )
@@ -110,22 +111,19 @@ func (c *Controller) storeDenyConnection(pktIn *ofctrl.PacketIn) error {
 	}
 	matchers := pktIn.GetMatches()
 
-	// Get 5-tuple information
 	sourceAddr, _ := netip.AddrFromSlice(packet.SourceIP)
 	destinationAddr, _ := netip.AddrFromSlice(packet.DestinationIP)
-	tuple := flowexporter.Tuple{
-		SourceAddress:      sourceAddr,
-		DestinationAddress: destinationAddr,
-		SourcePort:         packet.SourcePort,
-		DestinationPort:    packet.DestinationPort,
-		Protocol:           packet.IPProto,
-	}
+	builder := connectionstest.NewBuilder().
+		SetSourceAddress(sourceAddr).
+		SetDestinationAddress(destinationAddr).
+		SetSourcePort(packet.SourcePort).
+		SetDestinationPort(packet.DestinationPort).
+		SetProtocol(packet.IPProto).
+		SetOriginalDestinationAddress(destinationAddr).
+		SetOriginalDestinationPort(packet.DestinationPort)
 
 	// Generate deny connection and add to deny connection store
-	denyConn := flowexporter.Connection{}
-	denyConn.FlowKey = tuple
-	denyConn.OriginalDestinationAddress = tuple.DestinationAddress
-	denyConn.OriginalDestinationPort = tuple.DestinationPort
+	denyConn := *builder.Get()
 	denyConn.Mark = getCTMarkValue(matchers)
 	nwDstValue := getCTNwDstValue(matchers)
 	dstPortValue := getCTTpDstValue(matchers)
