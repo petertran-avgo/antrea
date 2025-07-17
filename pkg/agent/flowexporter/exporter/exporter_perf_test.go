@@ -307,21 +307,22 @@ func addDenyConns(connStore *connections.DenyConnectionStore, expirePriorityQueu
 			src = exptest.RandIPv4()
 			dst = exptest.RandIPv4()
 		}
-		flowKey := flowexporter.Tuple{SourceAddress: src, DestinationAddress: dst, Protocol: 6, SourcePort: uint16(i), DestinationPort: uint16(i)}
 		randomDuration := getRandomNum(255)
-		conn := &flowexporter.Connection{
-			StartTime:                     time.Now().Add(-time.Duration(randomDuration) * time.Second),
-			StopTime:                      time.Now(),
-			FlowKey:                       flowKey,
-			OriginalPackets:               10,
-			OriginalBytes:                 100,
-			SourcePodNamespace:            "ns1",
-			SourcePodName:                 "pod1",
-			EgressNetworkPolicyName:       "egress-reject",
-			EgressNetworkPolicyType:       registry.PolicyTypeAntreaNetworkPolicy,
-			EgressNetworkPolicyNamespace:  "egress-ns",
-			EgressNetworkPolicyRuleAction: registry.NetworkPolicyRuleActionReject,
-		}
+		conn := connectionstest.NewBuilder().
+			SetSourceAddress(src).
+			SetDestinationAddress(dst).
+			SetSourcePort(uint16(i)).
+			SetDestinationPort(uint16(i)).
+			SetStartTime(time.Now().Add(-time.Duration(randomDuration) * time.Second)).
+			SetStopTime(time.Now()).
+			SetOriginalPackets(10).
+			SetOriginalBytes(100).
+			SetSourcePodNamespace("ns1").
+			SetSourcePodName("pod1").
+			SetEgressNetworkPolicyName("egress-reject").
+			SetEgressNetworkPolicyType(registry.PolicyTypeAntreaNetworkPolicy).
+			SetEgressNetworkPolicyNamespace("egress-ns").
+			SetEgressNetworkPolicyRuleAction(registry.NetworkPolicyRuleActionReject).Get()
 		connKey := flowexporter.NewConnectionKey(conn)
 		connStore.AddConnToMap(&connKey, conn)
 		pqItem := &flowexporter.ItemToExpire{
