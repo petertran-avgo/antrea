@@ -14,6 +14,8 @@ type Builder struct {
 	destinationAddress             netip.Addr
 	destinationPodName             string
 	destinationPodNamespace        string
+	sourcePodName                  string
+	sourcePodNamespace             string
 	sourceAddress                  netip.Addr
 	zone                           uint16
 	protocol                       uint8
@@ -88,6 +90,8 @@ func (b Builder) Get() *flowexporter.Connection {
 		IngressNetworkPolicyRuleAction: b.ingressNetworkPolicyRuleAction,
 		DestinationPodName:             b.destinationPodName,
 		DestinationPodNamespace:        b.destinationPodNamespace,
+		SourcePodName:                  b.sourcePodName,
+		SourcePodNamespace:             b.sourcePodNamespace,
 	}
 }
 
@@ -233,6 +237,16 @@ func (b Builder) SetIngressNetworkPolicyRuleName(name string) Builder {
 
 func (b Builder) SetIngressNetworkPolicyRuleAction(action uint8) Builder {
 	b.ingressNetworkPolicyRuleAction = action
+	return b
+}
+
+func (b Builder) SetSourcePodName(name string) Builder {
+	b.sourcePodName = name
+	return b
+}
+
+func (b Builder) SetSourcePodNamespace(namespace string) Builder {
+	b.sourcePodNamespace = namespace
 	return b
 }
 
