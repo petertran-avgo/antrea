@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"antrea.io/antrea/pkg/agent/flowexporter"
+	connectionstest "antrea.io/antrea/pkg/agent/flowexporter/connections/testing"
 	"antrea.io/antrea/pkg/agent/flowexporter/exporter/filter"
 	"antrea.io/antrea/pkg/agent/metrics"
 	"antrea.io/antrea/pkg/agent/openflow"
@@ -39,6 +40,18 @@ func TestDenyConnectionStore_AddOrUpdateConn(t *testing.T) {
 	// Create flow for testing adding and updating of same connection.
 	refTime := time.Now()
 	tuple := flowexporter.Tuple{SourceAddress: netip.MustParseAddr("1.2.3.4"), DestinationAddress: netip.MustParseAddr("4.3.2.1"), Protocol: 6, SourcePort: 65280, DestinationPort: 255}
+	builder := connectionstest.NewBuilder().
+		SetSourcePort(65280).
+		SetDestinationPort(255).
+		SetStopTime(refTime.Add(-(time.Second * 20))).
+		SetStartTime(refTime.Add(-(time.Second * 20))).
+		SetOriginalDestinationAddress(netip.MustParseAddr("4.3.2.1")).
+		SetOriginalDestinationPort(255).
+		SetOriginalBytes(uint64(60)).
+		SetOriginalPackets(uint64(1)).
+		SetActive().
+		SetMark(openflow.ServiceCTMark.GetValue())
+
 	servicePortName := k8sproxy.ServicePortName{
 		NamespacedName: types.NamespacedName{
 			Namespace: "serviceNS1",
@@ -56,62 +69,22 @@ func TestDenyConnectionStore_AddOrUpdateConn(t *testing.T) {
 		expectConnectionNotFound bool
 	}{
 		{
-			name: "Flow not through service",
-			testFlow: flowexporter.Connection{
-				StopTime:                   refTime.Add(-(time.Second * 20)),
-				StartTime:                  refTime.Add(-(time.Second * 20)),
-				FlowKey:                    tuple,
-				OriginalDestinationAddress: tuple.DestinationAddress,
-				OriginalDestinationPort:    tuple.DestinationPort,
-				OriginalBytes:              uint64(60),
-				OriginalPackets:            uint64(1),
-				IsActive:                   true,
-				Mark:                       0,
-			},
-			isSvc: false,
+			name:     "Flow not through service",
+			testFlow: *builder.SetMark(0).Get(),
+			isSvc:    false,
 		}, {
-			name: "Flow through service",
-			testFlow: flowexporter.Connection{
-				StopTime:                   refTime.Add(-(time.Second * 20)),
-				StartTime:                  refTime.Add(-(time.Second * 20)),
-				FlowKey:                    tuple,
-				OriginalDestinationAddress: tuple.DestinationAddress,
-				OriginalDestinationPort:    tuple.DestinationPort,
-				OriginalBytes:              uint64(60),
-				OriginalPackets:            uint64(1),
-				IsActive:                   true,
-				Mark:                       openflow.ServiceCTMark.GetValue(),
-			},
-			isSvc: true,
+			name:     "Flow through service",
+			testFlow: *builder.Get(),
+			isSvc:    true,
 		}, {
-			name: "With SCTP protocol filter",
-			testFlow: flowexporter.Connection{
-				StopTime:                   refTime.Add(-(time.Second * 20)),
-				StartTime:                  refTime.Add(-(time.Second * 20)),
-				FlowKey:                    tuple,
-				OriginalDestinationAddress: tuple.DestinationAddress,
-				OriginalDestinationPort:    tuple.DestinationPort,
-				OriginalBytes:              uint64(60),
-				OriginalPackets:            uint64(1),
-				IsActive:                   true,
-				Mark:                       openflow.ServiceCTMark.GetValue(),
-			},
+			name:                     "With SCTP protocol filter",
+			testFlow:                 *builder.Get(),
 			isSvc:                    true,
 			protocolFilter:           []string{"SCTP"},
 			expectConnectionNotFound: true,
 		}, {
-			name: "With TCP protocol filter",
-			testFlow: flowexporter.Connection{
-				StopTime:                   refTime.Add(-(time.Second * 20)),
-				StartTime:                  refTime.Add(-(time.Second * 20)),
-				FlowKey:                    tuple,
-				OriginalDestinationAddress: tuple.DestinationAddress,
-				OriginalDestinationPort:    tuple.DestinationPort,
-				OriginalBytes:              uint64(60),
-				OriginalPackets:            uint64(1),
-				IsActive:                   true,
-				Mark:                       openflow.ServiceCTMark.GetValue(),
-			},
+			name:           "With TCP protocol filter",
+			testFlow:       *builder.Get(),
 			isSvc:          true,
 			protocolFilter: []string{"TCP"},
 		},
