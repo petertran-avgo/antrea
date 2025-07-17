@@ -36,6 +36,7 @@ import (
 
 	"antrea.io/antrea/pkg/agent/flowexporter"
 	"antrea.io/antrea/pkg/agent/flowexporter/connections"
+	connectionstest "antrea.io/antrea/pkg/agent/flowexporter/connections/testing"
 	"antrea.io/antrea/pkg/agent/flowexporter/exporter/filter"
 	"antrea.io/antrea/pkg/agent/flowexporter/priorityqueue"
 	exptest "antrea.io/antrea/pkg/agent/flowexporter/testing"
@@ -259,26 +260,27 @@ func addConns(connStore *connections.ConntrackConnectionStore, expirePriorityQue
 			dst = exptest.RandIPv4()
 			svc = exptest.RandIPv4()
 		}
-		flowKey := flowexporter.Tuple{SourceAddress: src, DestinationAddress: dst, Protocol: 6, SourcePort: uint16(i), DestinationPort: uint16(i)}
+
 		randomDuration := getRandomNum(255)
-		conn := &flowexporter.Connection{
-			StartTime:                  time.Now().Add(-time.Duration(randomDuration) * time.Second),
-			StopTime:                   time.Now(),
-			IsPresent:                  true,
-			ReadyToDelete:              false,
-			FlowKey:                    flowKey,
-			OriginalPackets:            100,
-			OriginalBytes:              10,
-			ReversePackets:             50,
-			ReverseBytes:               5,
-			SourcePodNamespace:         "ns1",
-			SourcePodName:              "pod1",
-			DestinationPodNamespace:    "ns2",
-			DestinationPodName:         "pod2",
-			DestinationServicePortName: "service",
-			OriginalDestinationAddress: svc,
-			TCPState:                   "SYN_SENT",
-		}
+		conn := connectionstest.NewBuilder().
+			SetSourceAddress(src).
+			SetDestinationAddress(dst).
+			SetSourcePort(uint16(i)).
+			SetDestinationPort(uint16(i)).
+			SetStartTime(time.Now().Add(-time.Duration(randomDuration) * time.Second)).
+			SetStopTime(time.Now()).
+			SetPresent().
+			SetOriginalPackets(100).
+			SetOriginalBytes(10).
+			SetReversePackets(50).
+			SetReverseBytes(5).
+			SetSourcePodNamespace("ns1").
+			SetSourcePodName("pod1").
+			SetDestinationPodNamespace("ns2").
+			SetDestinationPodName("pod2").
+			SetDestinationServicePortName("service").
+			SetOriginalDestinationAddress(svc).
+			SetTCPState("SYN_SENT").Get()
 		connKey := flowexporter.NewConnectionKey(conn)
 		// set connection to dying state
 		if i >= randomNum && i < testNumOfDyingConns+randomNum {
