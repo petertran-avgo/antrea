@@ -42,6 +42,10 @@ type Builder struct {
 	ingressNetworkPolicyType       uint8
 	ingressNetworkPolicyRuleName   string
 	ingressNetworkPolicyRuleAction uint8
+	egressNetworkPolicyName        string
+	egressNetworkPolicyNamespace   string
+	egressNetworkPolicyType        uint8
+	egressNetworkPolicyRuleAction  uint8
 }
 
 func NewBuilder() Builder {
@@ -88,6 +92,10 @@ func (b Builder) Get() *flowexporter.Connection {
 		IngressNetworkPolicyType:       b.ingressNetworkPolicyType,
 		IngressNetworkPolicyRuleName:   b.ingressNetworkPolicyRuleName,
 		IngressNetworkPolicyRuleAction: b.ingressNetworkPolicyRuleAction,
+		EgressNetworkPolicyName:        b.egressNetworkPolicyName,
+		EgressNetworkPolicyNamespace:   b.egressNetworkPolicyNamespace,
+		EgressNetworkPolicyType:        b.egressNetworkPolicyType,
+		EgressNetworkPolicyRuleAction:  b.egressNetworkPolicyRuleAction,
 		DestinationPodName:             b.destinationPodName,
 		DestinationPodNamespace:        b.destinationPodNamespace,
 		SourcePodName:                  b.sourcePodName,
@@ -237,6 +245,26 @@ func (b Builder) SetIngressNetworkPolicyRuleName(name string) Builder {
 
 func (b Builder) SetIngressNetworkPolicyRuleAction(action uint8) Builder {
 	b.ingressNetworkPolicyRuleAction = action
+	return b
+}
+
+func (b Builder) SetEgressNetworkPolicyName(name string) Builder {
+	b.egressNetworkPolicyName = name
+	return b
+}
+
+func (b Builder) SetEgressNetworkPolicyNamespace(namespace string) Builder {
+	b.egressNetworkPolicyNamespace = namespace
+	return b
+}
+
+func (b Builder) SetEgressNetworkPolicyType(policyType uint8) Builder {
+	b.egressNetworkPolicyType = policyType
+	return b
+}
+
+func (b Builder) SetEgressNetworkPolicyRuleAction(action uint8) Builder {
+	b.egressNetworkPolicyRuleAction = action
 	return b
 }
 
