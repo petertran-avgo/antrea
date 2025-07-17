@@ -120,11 +120,11 @@ func (c *Controller) storeDenyConnection(pktIn *ofctrl.PacketIn) error {
 		SetDestinationPort(packet.DestinationPort).
 		SetProtocol(packet.IPProto).
 		SetOriginalDestinationAddress(destinationAddr).
-		SetOriginalDestinationPort(packet.DestinationPort)
+		SetOriginalDestinationPort(packet.DestinationPort).
+		SetMark(getCTMarkValue(matchers))
 
 	// Generate deny connection and add to deny connection store
 	denyConn := *builder.Get()
-	denyConn.Mark = getCTMarkValue(matchers)
 	nwDstValue := getCTNwDstValue(matchers)
 	dstPortValue := getCTTpDstValue(matchers)
 	if nwDstValue.IsValid() {
