@@ -456,40 +456,30 @@ func getElemList(ianaIE []string, antreaIE []string) []ipfixentities.InfoElement
 }
 
 func getConnection(isIPv6 bool, isPresent bool, statusFlag uint32, protoID uint8, tcpState string) *flowexporter.Connection {
-	var tuple flowexporter.Tuple
-	if !isIPv6 {
-		tuple = flowexporter.Tuple{SourceAddress: netip.MustParseAddr("1.2.3.4"), DestinationAddress: netip.MustParseAddr("4.3.2.1"), Protocol: 6, SourcePort: 65280, DestinationPort: 255}
-	} else {
-		srcIP := netip.MustParseAddr("2001:0:3238:dfe1:63::fefb")
-		dstIP := netip.MustParseAddr("2001:0:3238:dfe1:63::fefc")
-		tuple = flowexporter.Tuple{SourceAddress: srcIP, DestinationAddress: dstIP, Protocol: protoID, SourcePort: 65280, DestinationPort: 255}
+	builder := connectionstest.NewBuilder().
+		SetSourcePort(65280).
+		SetDestinationPort(255).
+		SetZone(0)
+	if isIPv6 {
+		builder.SetSourceAddress(netip.MustParseAddr("2001:0:3238:dfe1:63::fefb")).
+			SetDestinationAddress(netip.MustParseAddr("2001:0:3238:dfe1:63::fefc")).
+			SetProtocol(protoID)
 	}
-	conn := &flowexporter.Connection{
-		StartTime:                     time.Time{},
-		StopTime:                      time.Time{},
-		StatusFlag:                    statusFlag,
-		OriginalPackets:               0xab,
-		OriginalBytes:                 0xabcd,
-		ReversePackets:                0xa,
-		ReverseBytes:                  0xab,
-		FlowKey:                       tuple,
-		IsPresent:                     isPresent,
-		SourcePodNamespace:            "ns",
-		SourcePodName:                 "pod",
-		DestinationPodNamespace:       "",
-		DestinationPodName:            "",
-		IngressNetworkPolicyName:      "",
-		IngressNetworkPolicyNamespace: "",
-		IngressNetworkPolicyType:      ipfixregistry.PolicyTypeK8sNetworkPolicy,
-		IngressNetworkPolicyRuleName:  "",
-		EgressNetworkPolicyName:       "np",
-		EgressNetworkPolicyNamespace:  "np-ns",
-		EgressNetworkPolicyType:       ipfixregistry.PolicyTypeK8sNetworkPolicy,
-		EgressNetworkPolicyRuleName:   "",
-		DestinationServicePortName:    "service",
-		TCPState:                      tcpState,
-	}
-	return conn
+
+	return builder.SetStatusFlag(statusFlag).
+		SetOriginalPackets(0xab).
+		SetOriginalBytes(0xabcd).
+		SetReversePackets(0xa).
+		SetReverseBytes(0xab).
+		SetPresent().
+		SetSourcePodNamespace("ns").
+		SetSourcePodName("pod").
+		SetIngressNetworkPolicyType(ipfixregistry.PolicyTypeK8sNetworkPolicy).
+		SetEgressNetworkPolicyName("np").
+		SetEgressNetworkPolicyNamespace("np-ns").
+		SetEgressNetworkPolicyType(ipfixregistry.PolicyTypeK8sNetworkPolicy).
+		SetDestinationServicePortName("service").
+		SetTCPState(tcpState).Get()
 }
 
 func getDenyConnection(isIPv6 bool, protoID uint8) *flowexporter.Connection {
