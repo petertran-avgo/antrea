@@ -99,18 +99,16 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	refTime := time.Now()
 
-	builder1 := connectionstest.NewBuilder().SetSourceAddress(netip.MustParseAddr("5.6.7.8")).
+	builder1 := *connectionstest.NewBuilder().SetSourceAddress(netip.MustParseAddr("5.6.7.8")).
 		SetDestinationAddress(netip.MustParseAddr("8.7.6.5")).SetStartTime(refTime).
 		SetStopTime(refTime).SetLabels([]byte{0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0}).
 		SetMark(openflow.ServiceCTMark.GetValue()).SetZone(0)
-	builder2 := connectionstest.NewBuilder().SetSourcePort(65280).SetDestinationPort(255).SetZone(0).
-		SetStartTime(refTime.Add(-(time.Second * 50))).SetStopTime(refTime).SetPresent().
-		SetLastExportTime(refTime.Add(-(time.Second * 50))).SetReversePackets(0xff)
-	builder3 := connectionstest.NewBuilder().SetSourceAddress(netip.MustParseAddr("10.10.10.10")).
+	builder2 := *connectionstest.NewBuilder().SetSourcePort(65280).SetDestinationPort(255).SetZone(0).
+		SetStartTime(refTime.Add(-(time.Second * 50))).SetPresent()
+	builder3 := *connectionstest.NewBuilder().SetSourceAddress(netip.MustParseAddr("10.10.10.10")).
 		SetDestinationAddress(netip.MustParseAddr("4.3.2.1")).SetProtocol(6).SetSourcePort(60000).
 		SetDestinationPort(100).SetZone(0).SetStartTime(refTime.Add(-(time.Second * 50))).
-		SetStopTime(refTime.Add(-(time.Second * 30))).SetLastExportTime(refTime.Add(-(time.Second * 50))).
-		SetOriginalBytes(0xbaaaaa00000000).SetTCPState("TIME_WAIT").SetPresent()
+		SetTCPState("TIME_WAIT").SetPresent()
 	tc := []struct {
 		name         string
 		oldConn      *flowexporter.Connection
@@ -133,13 +131,19 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 				SetOriginalPackets(0xfff).
 				SetOriginalBytes(0xbaaaaa00000000).
 				SetReversePackets(0xf).
-				SetReverseBytes(0xbaa).Get(),
-			newConn: *builder2.SetLastExportTime(time.Time{}).
+				SetReverseBytes(0xbaa).
+				SetLastExportTime(refTime.Add(-(time.Second * 50))).Get(),
+			newConn: *builder2.SetStopTime(refTime).
+				SetLastExportTime(time.Time{}).
 				SetOriginalPackets(0xffff).
 				SetOriginalBytes(0xbaaaaa0000000000).
+				SetReversePackets(0xff).
 				SetReverseBytes(0xbaaa).Get(),
-			expectedConn: *builder2.SetOriginalPackets(0xffff).
+			expectedConn: *builder2.SetStopTime(refTime).
+				SetLastExportTime(refTime.Add(-(time.Second * 50))).
+				SetOriginalPackets(0xffff).
 				SetOriginalBytes(0xbaaaaa0000000000).
+				SetReversePackets(0xff).
 				SetReverseBytes(0xbaaa).
 				SetActive().Get(),
 		},
@@ -148,16 +152,24 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 			// in connection store will not be updated.
 			name: "updateDyingConn",
 			oldConn: builder3.SetOriginalPackets(0xfff).
+				SetLastExportTime(refTime.Add(-(time.Second * 50))).
 				SetReversePackets(0xf).
-				SetReverseBytes(0xba).Get(),
-			newConn: *builder3.SetLastExportTime(time.Time{}).
+				SetReverseBytes(0xba).
+				SetStopTime(refTime.Add(-(time.Second * 30))).
+				SetOriginalBytes(0xbaaaaa00000000).Get(),
+			newConn: *builder3.SetOriginalPackets(0).
+				SetLastExportTime(time.Time{}).
+				SetReversePackets(0xff).
+				SetReverseBytes(0).
 				SetStopTime(refTime).
 				SetOriginalBytes(0xbaaaaa0000000000).
-				SetReversePackets(0xff).
 				Get(),
 			expectedConn: *builder3.SetOriginalPackets(0xfff).
+				SetLastExportTime(refTime.Add(-(time.Second * 50))).
 				SetReversePackets(0xf).
-				SetReverseBytes(0xba).Get(),
+				SetReverseBytes(0xba).
+				SetStopTime(refTime.Add(-(time.Second * 30))).
+				SetOriginalBytes(0xbaaaaa00000000).Get(),
 		},
 	}
 

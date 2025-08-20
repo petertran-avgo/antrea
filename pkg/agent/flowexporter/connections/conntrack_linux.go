@@ -27,6 +27,7 @@ import (
 
 	"antrea.io/antrea/pkg/agent/config"
 	"antrea.io/antrea/pkg/agent/flowexporter"
+	connectionstest "antrea.io/antrea/pkg/agent/flowexporter/connections/testing"
 	"antrea.io/antrea/pkg/agent/flowexporter/exporter/filter"
 	"antrea.io/antrea/pkg/agent/openflow"
 	"antrea.io/antrea/pkg/agent/util/sysctl"
@@ -126,47 +127,41 @@ func (nfct *netFilterConnTrack) DumpFlowsInCtZone(zoneFilter uint16) ([]*flowexp
 }
 
 func NetlinkFlowToAntreaConnection(conn *conntrack.Flow) *flowexporter.Connection {
-	newConn := flowexporter.Connection{
-		ID:         conn.ID,
-		Timeout:    conn.Timeout,
-		StartTime:  conn.Timestamp.Start,
-		IsPresent:  true,
-		Zone:       conn.Zone,
-		Mark:       conn.Mark,
-		Labels:     conn.Labels,
-		LabelsMask: conn.LabelsMask,
-		StatusFlag: uint32(conn.Status.Value),
-		FlowKey: flowexporter.Tuple{
-			SourceAddress:      conn.TupleOrig.IP.SourceAddress,
-			DestinationAddress: conn.TupleReply.IP.SourceAddress,
-			Protocol:           conn.TupleOrig.Proto.Protocol,
-			SourcePort:         conn.TupleOrig.Proto.SourcePort,
-			DestinationPort:    conn.TupleReply.Proto.SourcePort,
-		},
-		OriginalDestinationAddress: conn.TupleOrig.IP.DestinationAddress,
-		OriginalDestinationPort:    conn.TupleOrig.Proto.DestinationPort,
-		OriginalPackets:            conn.CountersOrig.Packets,
-		OriginalBytes:              conn.CountersOrig.Bytes,
-		ReversePackets:             conn.CountersReply.Packets,
-		ReverseBytes:               conn.CountersReply.Bytes,
-		SourcePodNamespace:         "",
-		SourcePodName:              "",
-		DestinationPodNamespace:    "",
-		DestinationPodName:         "",
-		TCPState:                   "",
-	}
+	builder := connectionstest.NewBuilder().
+		SetSourceAddress(conn.TupleOrig.IP.SourceAddress).
+		SetDestinationAddress(conn.TupleReply.IP.SourceAddress).
+		SetProtocol(conn.TupleOrig.Proto.Protocol).
+		SetSourcePort(conn.TupleOrig.Proto.SourcePort).
+		SetDestinationPort(conn.TupleReply.Proto.SourcePort).
+		SetID(conn.ID).
+		SetTimeout(conn.Timeout).
+		SetStartTime(conn.Timestamp.Start).
+		SetPresent().
+		SetZone(conn.Zone).
+		SetMark(conn.Mark).
+		SetLabels(conn.Labels).
+		SetLabelsMask(conn.LabelsMask).
+		SetStatusFlag(uint32(conn.Status.Value)).
+		SetOriginalDestinationAddress(conn.TupleOrig.IP.DestinationAddress).
+		SetOriginalDestinationPort(conn.TupleOrig.Proto.DestinationPort).
+		SetOriginalPackets(conn.CountersOrig.Packets).
+		SetOriginalBytes(conn.CountersOrig.Bytes).
+		SetReversePackets(conn.CountersReply.Packets).
+		SetReverseBytes(conn.CountersReply.Bytes)
+
 	if conn.ProtoInfo.TCP != nil {
-		newConn.TCPState = stateToString(conn.ProtoInfo.TCP.State)
+		builder.SetTCPState(stateToString(conn.ProtoInfo.TCP.State))
 	}
 
 	// Get the stop time from dumped connection if the connection is terminated(dying state).
 	if conn.Status.Dying() {
-		newConn.StopTime = conn.Timestamp.Stop
+		builder.SetStopTime(conn.Timestamp.Stop)
 	} else {
-		newConn.StopTime = time.Now()
+		builder.SetStopTime(time.Now())
 	}
 
-	return &newConn
+	return builder.Get()
+
 }
 
 func SetupConntrackParameters() error {

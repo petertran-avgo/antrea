@@ -34,6 +34,7 @@ type Builder struct {
 	id                             uint32
 	tcpState                       string
 	labels                         []byte
+	labelsMask                     []byte
 	lastExportTime                 time.Time
 	active                         bool
 	destinationServicePortName     string
@@ -48,8 +49,8 @@ type Builder struct {
 	egressNetworkPolicyRuleAction  uint8
 }
 
-func NewBuilder() Builder {
-	return Builder{
+func NewBuilder() *Builder {
+	return &Builder{
 		sourcePort:         60001,
 		destinationPort:    200,
 		destinationAddress: netip.MustParseAddr("4.3.2.1"),
@@ -59,7 +60,7 @@ func NewBuilder() Builder {
 	}
 }
 
-func (b Builder) Get() *flowexporter.Connection {
+func (b *Builder) Get() *flowexporter.Connection {
 	return &flowexporter.Connection{
 		FlowKey: flowexporter.Tuple{
 			SourceAddress:      b.sourceAddress,
@@ -84,6 +85,7 @@ func (b Builder) Get() *flowexporter.Connection {
 		ID:                             b.id,
 		TCPState:                       b.tcpState,
 		Labels:                         b.labels,
+		LabelsMask:                     b.labelsMask,
 		LastExportTime:                 b.lastExportTime,
 		IsActive:                       b.active,
 		DestinationServicePortName:     b.destinationServicePortName,
@@ -103,187 +105,192 @@ func (b Builder) Get() *flowexporter.Connection {
 	}
 }
 
-func (b Builder) SetSourcePort(sourcePort uint16) Builder {
+func (b *Builder) SetSourcePort(sourcePort uint16) *Builder {
 	b.sourcePort = sourcePort
 	return b
 }
 
-func (b Builder) SetDestinationPort(destinationPort uint16) Builder {
+func (b *Builder) SetDestinationPort(destinationPort uint16) *Builder {
 	b.destinationPort = destinationPort
 	return b
 }
 
-func (b Builder) SetOriginalDestinationPort(originalDestinationPort uint16) Builder {
+func (b *Builder) SetOriginalDestinationPort(originalDestinationPort uint16) *Builder {
 	b.originalDestinationPort = originalDestinationPort
 	return b
 }
 
-func (b Builder) SetDestinationAddress(destinationAddress netip.Addr) Builder {
+func (b *Builder) SetDestinationAddress(destinationAddress netip.Addr) *Builder {
 	b.destinationAddress = destinationAddress
 	return b
 }
 
-func (b Builder) SetOriginalDestinationAddress(originalDestinationAddress netip.Addr) Builder {
+func (b *Builder) SetOriginalDestinationAddress(originalDestinationAddress netip.Addr) *Builder {
 	b.originalDestinationAddress = originalDestinationAddress
 	return b
 }
 
-func (b Builder) SetSourceAddress(sourceAddress netip.Addr) Builder {
+func (b *Builder) SetSourceAddress(sourceAddress netip.Addr) *Builder {
 	b.sourceAddress = sourceAddress
 	return b
 }
 
-func (b Builder) SetZone(zone uint16) Builder {
+func (b *Builder) SetZone(zone uint16) *Builder {
 	b.zone = zone
 	return b
 }
 
-func (b Builder) SetProtocol(protocol uint8) Builder {
+func (b *Builder) SetProtocol(protocol uint8) *Builder {
 	b.protocol = protocol
 	return b
 }
 
-func (b Builder) SetTimeout(timeout uint32) Builder {
+func (b *Builder) SetTimeout(timeout uint32) *Builder {
 	b.timeout = timeout
 	return b
 }
 
-func (b Builder) SetStartTime(startTime time.Time) Builder {
+func (b *Builder) SetStartTime(startTime time.Time) *Builder {
 	b.startTime = startTime
 	return b
 }
 
-func (b Builder) SetStopTime(stopTime time.Time) Builder {
+func (b *Builder) SetStopTime(stopTime time.Time) *Builder {
 	b.stopTime = stopTime
 	return b
 }
 
-func (b Builder) SetPresent() Builder {
+func (b *Builder) SetPresent() *Builder {
 	b.present = true
 	return b
 }
 
-func (b Builder) SetStatusFlag(statusFlag uint32) Builder {
+func (b *Builder) SetStatusFlag(statusFlag uint32) *Builder {
 	b.statusFlag = statusFlag
 	return b
 }
 
-func (b Builder) SetMark(mark uint32) Builder {
+func (b *Builder) SetMark(mark uint32) *Builder {
 	b.mark = mark
 	return b
 }
 
-func (b Builder) SetOriginalPackets(packets uint64) Builder {
+func (b *Builder) SetOriginalPackets(packets uint64) *Builder {
 	b.originalPackets = packets
 	return b
 }
 
-func (b Builder) SetOriginalBytes(bytes uint64) Builder {
+func (b *Builder) SetOriginalBytes(bytes uint64) *Builder {
 	b.originalBytes = bytes
 	return b
 }
 
-func (b Builder) SetReversePackets(packets uint64) Builder {
+func (b *Builder) SetReversePackets(packets uint64) *Builder {
 	b.reversePackets = packets
 	return b
 }
 
-func (b Builder) SetReverseBytes(bytes uint64) Builder {
+func (b *Builder) SetReverseBytes(bytes uint64) *Builder {
 	b.reverseBytes = bytes
 	return b
 }
 
-func (b Builder) SetTCPState(state string) Builder {
+func (b *Builder) SetTCPState(state string) *Builder {
 	b.tcpState = state
 	return b
 }
 
-func (b Builder) SetID(id uint32) Builder {
+func (b *Builder) SetID(id uint32) *Builder {
 	b.id = id
 	return b
 }
 
-func (b Builder) SetLabels(labels []byte) Builder {
+func (b *Builder) SetLabels(labels []byte) *Builder {
 	b.labels = labels
 	return b
 }
 
-func (b Builder) SetLastExportTime(time time.Time) Builder {
+func (b *Builder) SetLabelsMask(labels []byte) *Builder {
+	b.labelsMask = labels
+	return b
+}
+
+func (b *Builder) SetLastExportTime(time time.Time) *Builder {
 	b.lastExportTime = time
 	return b
 }
 
-func (b Builder) SetActive() Builder {
+func (b *Builder) SetActive() *Builder {
 	b.active = true
 	return b
 }
 
-func (b Builder) SetDestinationServicePortName(name string) Builder {
+func (b *Builder) SetDestinationServicePortName(name string) *Builder {
 	b.destinationServicePortName = name
 	return b
 }
 
-func (b Builder) SetIngressNetworkPolicyName(name string) Builder {
+func (b *Builder) SetIngressNetworkPolicyName(name string) *Builder {
 	b.ingressNetworkPolicyName = name
 	return b
 }
 
-func (b Builder) SetIngressNetworkPolicyNamespace(namespace string) Builder {
+func (b *Builder) SetIngressNetworkPolicyNamespace(namespace string) *Builder {
 	b.ingressNetworkPolicyNamespace = namespace
 	return b
 }
 
-func (b Builder) SetIngressNetworkPolicyType(policyType uint8) Builder {
+func (b *Builder) SetIngressNetworkPolicyType(policyType uint8) *Builder {
 	b.ingressNetworkPolicyType = policyType
 	return b
 }
 
-func (b Builder) SetIngressNetworkPolicyRuleName(name string) Builder {
+func (b *Builder) SetIngressNetworkPolicyRuleName(name string) *Builder {
 	b.ingressNetworkPolicyRuleName = name
 	return b
 }
 
-func (b Builder) SetIngressNetworkPolicyRuleAction(action uint8) Builder {
+func (b *Builder) SetIngressNetworkPolicyRuleAction(action uint8) *Builder {
 	b.ingressNetworkPolicyRuleAction = action
 	return b
 }
 
-func (b Builder) SetEgressNetworkPolicyName(name string) Builder {
+func (b *Builder) SetEgressNetworkPolicyName(name string) *Builder {
 	b.egressNetworkPolicyName = name
 	return b
 }
 
-func (b Builder) SetEgressNetworkPolicyNamespace(namespace string) Builder {
+func (b *Builder) SetEgressNetworkPolicyNamespace(namespace string) *Builder {
 	b.egressNetworkPolicyNamespace = namespace
 	return b
 }
 
-func (b Builder) SetEgressNetworkPolicyType(policyType uint8) Builder {
+func (b *Builder) SetEgressNetworkPolicyType(policyType uint8) *Builder {
 	b.egressNetworkPolicyType = policyType
 	return b
 }
 
-func (b Builder) SetEgressNetworkPolicyRuleAction(action uint8) Builder {
+func (b *Builder) SetEgressNetworkPolicyRuleAction(action uint8) *Builder {
 	b.egressNetworkPolicyRuleAction = action
 	return b
 }
 
-func (b Builder) SetSourcePodName(name string) Builder {
+func (b *Builder) SetSourcePodName(name string) *Builder {
 	b.sourcePodName = name
 	return b
 }
 
-func (b Builder) SetSourcePodNamespace(namespace string) Builder {
+func (b *Builder) SetSourcePodNamespace(namespace string) *Builder {
 	b.sourcePodNamespace = namespace
 	return b
 }
 
-func (b Builder) SetDestinationPodName(name string) Builder {
+func (b *Builder) SetDestinationPodName(name string) *Builder {
 	b.destinationPodName = name
 	return b
 }
 
-func (b Builder) SetDestinationPodNamespace(namespace string) Builder {
+func (b *Builder) SetDestinationPodNamespace(namespace string) *Builder {
 	b.destinationPodNamespace = namespace
 	return b
 }

@@ -49,8 +49,7 @@ func TestDenyConnectionStore_AddOrUpdateConn(t *testing.T) {
 		SetOriginalDestinationPort(255).
 		SetOriginalBytes(uint64(60)).
 		SetOriginalPackets(uint64(1)).
-		SetActive().
-		SetMark(openflow.ServiceCTMark.GetValue())
+		SetActive()
 
 	servicePortName := k8sproxy.ServicePortName{
 		NamespacedName: types.NamespacedName{
@@ -74,17 +73,17 @@ func TestDenyConnectionStore_AddOrUpdateConn(t *testing.T) {
 			isSvc:    false,
 		}, {
 			name:     "Flow through service",
-			testFlow: *builder.Get(),
+			testFlow: *builder.SetMark(openflow.ServiceCTMark.GetValue()).Get(),
 			isSvc:    true,
 		}, {
 			name:                     "With SCTP protocol filter",
-			testFlow:                 *builder.Get(),
+			testFlow:                 *builder.SetMark(openflow.ServiceCTMark.GetValue()).Get(),
 			isSvc:                    true,
 			protocolFilter:           []string{"SCTP"},
 			expectConnectionNotFound: true,
 		}, {
 			name:           "With TCP protocol filter",
-			testFlow:       *builder.Get(),
+			testFlow:       *builder.SetMark(openflow.ServiceCTMark.GetValue()).Get(),
 			isSvc:          true,
 			protocolFilter: []string{"TCP"},
 		},
