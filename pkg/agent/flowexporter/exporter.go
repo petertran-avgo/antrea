@@ -321,16 +321,12 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection) uint8 {
 		klog.V(5).InfoS("Can't find flow type without nodeRouteController")
 		return utils.FlowTypeUnspecified
 	}
-	srcIsPod, srcIsGw := exp.nodeRouteController.LookupIPInPodSubnets(conn.FlowKey.SourceAddress)
+	_, srcIsGw := exp.nodeRouteController.LookupIPInPodSubnets(conn.FlowKey.SourceAddress)
 	dstIsPod, dstIsGw := exp.nodeRouteController.LookupIPInPodSubnets(conn.FlowKey.DestinationAddress)
 	if srcIsGw || dstIsGw {
 		// This matches what we do in filterAntreaConns but is more general as we consider
 		// remote gateways as well.
 		klog.V(5).InfoS("Flows where the source or destination IP is a gateway IP will not be exported")
-		return utils.FlowTypeUnsupported
-	}
-	if !srcIsPod {
-		klog.V(5).InfoS("Flows where the source is not a Pod will not be exported")
 		return utils.FlowTypeUnsupported
 	}
 	if !dstIsPod {
