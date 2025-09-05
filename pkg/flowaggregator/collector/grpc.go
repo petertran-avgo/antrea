@@ -131,6 +131,7 @@ func (s *grpcService) Export(stream flowpb.FlowExportService_ExportServer) error
 		}
 
 		for _, record := range req.Flows {
+			klog.InfoS("received record", "record", record)
 			s.numRecordsReceived.Add(1)
 			record.Ipfix.ExporterIp = exportAddress
 			s.recordCh <- record

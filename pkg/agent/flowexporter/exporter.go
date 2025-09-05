@@ -373,6 +373,7 @@ func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 	if klog.V(5).Enabled() {
 		klog.InfoS("Record for connection sent successfully", "flowKey", conn.FlowKey, "connection", conn)
 	}
+	klog.InfoS("Record for connection sent successfully", "flowKey", conn.FlowKey, "connection", conn)
 	return nil
 }
 
