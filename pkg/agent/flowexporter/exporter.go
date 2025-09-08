@@ -361,6 +361,7 @@ func (exp *FlowExporter) fillEgressInfo(conn *connection.Connection) {
 func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 	conn.FlowType = exp.findFlowType(*conn)
 	if conn.FlowType == utils.FlowTypeUnsupported {
+		klog.InfoS("Record not exported due to unsupported flowtype", "connection", conn)
 		return nil
 	}
 	if conn.FlowType == utils.FlowTypeToExternal {
