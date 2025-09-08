@@ -58,6 +58,7 @@ func filterAntreaConns(conns []*connection.Connection, nodeConfig *config.NodeCo
 
 		// Consider Pod-to-Pod, Pod-To-Service and Pod-To-External flows.
 		if srcIP == gwIPv4 || dstIP == gwIPv4 {
+			klog.InfoS("Skipping", "conn", conn)
 			continue
 		}
 		if srcIP == gwIPv6 || dstIP == gwIPv6 {
