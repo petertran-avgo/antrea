@@ -412,6 +412,7 @@ func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 	}
 
 	if conn.FlowType == utils.FlowTypeFromExternal {
+		klog.InfoS("flow is fromExternal", "conn", conn)
 		exp.fillServiceInfo(conn)
 	}
 
