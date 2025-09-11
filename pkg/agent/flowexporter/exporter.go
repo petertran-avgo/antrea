@@ -23,6 +23,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -345,7 +346,7 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection) uint8 {
 			klog.InfoS("failed to serviceNamespacelister", "destination pod namespace", conn.DestinationPodNamespace)
 			return utils.FlowTypeUnsupported
 		}
-		services, err := serviceNamespaceLister.List(nil)
+		services, err := serviceNamespaceLister.List(labels.NewSelector())
 		if err != nil {
 			klog.InfoS("failed to list services", "err", err)
 			return utils.FlowTypeUnsupported
