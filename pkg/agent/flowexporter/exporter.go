@@ -385,6 +385,7 @@ func (exp *FlowExporter) fillServiceInfo(conn *connection.Connection) {
 	services, err := exp.serviceInformer.Lister().Services(conn.DestinationPodNamespace).List(nil)
 	if err != nil {
 		klog.V(2).InfoS("Failed to list services while populating service name for FlowTypeToExternal flow", "error", err, "FlowKey", conn.FlowKey)
+		return
 	}
 	matchingServiceName := getServiceName(conn.OriginalDestinationPort, services)
 	if matchingServiceName == "" {
