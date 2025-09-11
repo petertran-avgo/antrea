@@ -21,7 +21,9 @@ import (
 	"net"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -78,12 +80,13 @@ type FlowExporter struct {
 	l7Listener             *connections.L7Listener
 	nodeName               string
 	obsDomainID            uint32
+	serviceInformer        coreinformers.ServiceInformer
 }
 
 func NewFlowExporter(podStore objectstore.PodStore, proxier proxy.Proxier, k8sClient kubernetes.Interface, nodeRouteController *noderoute.Controller,
 	trafficEncapMode config.TrafficEncapModeType, nodeConfig *config.NodeConfig, v4Enabled, v6Enabled bool, serviceCIDRNet, serviceCIDRNetv6 *net.IPNet,
 	ovsDatapathType ovsconfig.OVSDatapathType, proxyEnabled bool, npQuerier querier.AgentNetworkPolicyInfoQuerier, o *options.FlowExporterOptions,
-	egressQuerier querier.EgressQuerier, podL7FlowExporterAttrGetter connections.PodL7FlowExporterAttrGetter, l7FlowExporterEnabled bool) (*FlowExporter, error) {
+	egressQuerier querier.EgressQuerier, podL7FlowExporterAttrGetter connections.PodL7FlowExporterAttrGetter, l7FlowExporterEnabled bool, serviceInformer coreinformers.ServiceInformer) (*FlowExporter, error) {
 
 	protocolFilter := filter.NewProtocolFilter(o.ProtocolFilter)
 	connTrackDumper := connections.InitializeConnTrackDumper(nodeConfig, serviceCIDRNet, serviceCIDRNetv6, ovsDatapathType, proxyEnabled, protocolFilter)
@@ -145,6 +148,7 @@ func NewFlowExporter(podStore objectstore.PodStore, proxier proxy.Proxier, k8sCl
 		l7Listener:             l7Listener,
 		nodeName:               nodeName,
 		obsDomainID:            obsDomainID,
+		serviceInformer:        serviceInformer,
 	}, nil
 }
 
@@ -361,6 +365,37 @@ func (exp *FlowExporter) fillEgressInfo(conn *connection.Connection) {
 	}
 }
 
+// getServiceName returns the name of the service from the set of services provided
+// which has the matching provided port. Empty string is returned if no service match
+// is found.
+func getServiceName(port uint16, services []*corev1.Service) string {
+	for _, service := range services {
+		for _, servicePort := range service.Spec.Ports {
+			if servicePort.NodePort == int32(port) {
+				return service.Name
+			}
+		}
+	}
+
+	return ""
+}
+
+// fillServiceInfo updates the given conn of type FlowTypeToExternal with the name of
+// the service whos port matches the destination port. If no match is found, empty string
+// is filled in as service name and a message is logged. If services can not be listed,
+// the error is logged
+func (exp *FlowExporter) fillServiceInfo(conn *connection.Connection) {
+	services, err := exp.serviceInformer.Lister().Services(conn.DestinationPodNamespace).List(nil)
+	if err != nil {
+		klog.V(2).InfoS("Failed to list services while populating service name for FlowTypeToExternal flow", "error", err, "FlowKey", conn.FlowKey)
+	}
+	matchingServiceName := getServiceName(conn.OriginalDestinationPort, services)
+	if matchingServiceName == "" {
+		klog.V(2).InfoS("Filling in Service info for flow but did not find a service with matching port", "FlowKey", conn.FlowKey)
+	}
+	conn.DestinationServicePortName = matchingServiceName
+}
+
 func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 	conn.FlowType = exp.findFlowType(*conn)
 	if conn.FlowType == utils.FlowTypeUnsupported {
@@ -375,6 +410,11 @@ func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 			return nil
 		}
 	}
+
+	if conn.FlowType == utils.FlowTypeFromExternal {
+		exp.fillServiceInfo(conn)
+	}
+
 	if err := exp.exporter.Export(conn); err != nil {
 		return err
 	}
