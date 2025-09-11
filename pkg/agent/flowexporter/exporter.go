@@ -402,7 +402,7 @@ func getServiceName(port uint16, services []*corev1.Service) string {
 // is filled in as service name and a message is logged. If services can not be listed,
 // the error is logged
 func (exp *FlowExporter) fillServiceInfo(conn *connection.Connection) {
-	services, err := exp.serviceInformer.Lister().Services(conn.DestinationPodNamespace).List(nil)
+	services, err := exp.serviceInformer.Lister().Services(conn.DestinationPodNamespace).List(labels.NewSelector())
 	if err != nil {
 		klog.V(2).InfoS("Failed to list services while populating service name for FlowTypeToExternal flow", "error", err, "FlowKey", conn.FlowKey)
 		return
