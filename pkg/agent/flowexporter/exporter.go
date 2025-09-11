@@ -335,7 +335,17 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection) uint8 {
 	}
 
 	if !srcIsPod {
-		services, err := exp.serviceInformer.Lister().Services(conn.DestinationPodNamespace).List(nil)
+		lister := exp.serviceInformer.Lister()
+		if lister == nil {
+			klog.Info("failed to createLister")
+			return utils.FlowTypeUnsupported
+		}
+		serviceNamespaceLister := lister.Services(conn.DestinationPodNamespace)
+		if serviceNamespaceLister == nil {
+			klog.InfoS("failed to serviceNamespacelister", "destination pod namespace", conn.DestinationPodNamespace)
+			return utils.FlowTypeUnsupported
+		}
+		services, err := serviceNamespaceLister.List(nil)
 		if err != nil {
 			klog.InfoS("failed to list services", "err", err)
 			return utils.FlowTypeUnsupported
