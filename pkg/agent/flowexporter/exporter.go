@@ -413,6 +413,9 @@ func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 			return nil
 		}
 	}
+	if conn.FlowType == utils.FlowTypeFromExternal {
+		exp.fillServiceInfo(conn)
+	}
 
 	if err := exp.exporter.Export(conn); err != nil {
 		return err
