@@ -21,6 +21,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/go-errors/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -336,6 +337,9 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection) uint8 {
 	}
 
 	if !srcIsPod {
+		if err := exp.fillServiceInfo(&conn); err == nil {
+			return utils.FlowTypeFromExternal
+		}
 		return utils.FlowTypeUnsupported
 	}
 
@@ -379,20 +383,21 @@ func getServiceName(port uint16, services []*corev1.Service) string {
 }
 
 // fillServiceInfo updates the given conn of type FlowTypeToExternal with the name of
-// the service whos port matches the destination port. If no match is found, empty string
-// is filled in as service name and a message is logged. If services can not be listed,
-// the error is logged
-func (exp *FlowExporter) fillServiceInfo(conn *connection.Connection) {
+// the service whos port matches the destination port. If no match is found, an error is returned
+func (exp *FlowExporter) fillServiceInfo(conn *connection.Connection) error {
+	//TODO error check along the way
 	services, err := exp.serviceInformer.Lister().Services(conn.DestinationPodNamespace).List(labels.NewSelector())
 	if err != nil {
-		klog.V(2).InfoS("Failed to list services while populating service name for FlowTypeToExternal flow", "error", err, "FlowKey", conn.FlowKey)
-		return
+		errorMessage := fmt.Errorf("Failed to find service info for connection %s. Failed to list services %w", conn, err)
+		klog.InfoS("Failed to find service info for connection", "error", errorMessage)
+		return errorMessage
 	}
 	matchingServiceName := getServiceName(conn.OriginalDestinationPort, services)
 	if matchingServiceName == "" {
-		klog.V(2).InfoS("Filling in Service info for flow but did not find a service with matching port", "FlowKey", conn.FlowKey)
+		return errors.Errorf("Failed to find service info for connection %s. No service with matching port found", conn)
 	}
 	conn.DestinationServicePortName = matchingServiceName
+	return nil
 }
 
 func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
@@ -400,13 +405,8 @@ func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 
 	if conn.FlowType == utils.FlowTypeUnsupported {
 		klog.InfoS("Record not exported due to unsupported flowtype", "connection", conn)
-		exp.fillServiceInfo(conn)
-		if conn.DestinationServicePortName != "" {
-			conn.FlowType = utils.FlowTypeFromExternal
-		} else {
-			return nil
-		}
 	}
+
 	if conn.FlowType == utils.FlowTypeToExternal {
 		if conn.SourcePodNamespace != "" && conn.SourcePodName != "" {
 			exp.fillEgressInfo(conn)
@@ -414,6 +414,10 @@ func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 			// Skip exporting the Pod-to-External connection at the Egress Node if it's different from the Source Node
 			return nil
 		}
+	}
+
+	if conn.FlowType == utils.FlowTypeFromExternal {
+		exp.fillServiceInfo(conn)
 	}
 
 	if err := exp.exporter.Export(conn); err != nil {
