@@ -336,26 +336,11 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection) uint8 {
 	}
 
 	if !srcIsPod {
-		lister := exp.serviceInformer.Lister()
-		if lister == nil {
-			klog.Info("failed to createLister")
-			return utils.FlowTypeUnsupported
+		exp.fillServiceInfo(&conn)
+		if conn.DestinationServicePortName != "" {
+			return utils.FlowTypeFromExternal
 		}
-		serviceNamespaceLister := lister.Services(conn.DestinationPodNamespace)
-		if serviceNamespaceLister == nil {
-			klog.InfoS("failed to serviceNamespacelister", "destination pod namespace", conn.DestinationPodNamespace)
-			return utils.FlowTypeUnsupported
-		}
-		services, err := serviceNamespaceLister.List(labels.NewSelector())
-		if err != nil {
-			klog.InfoS("failed to list services", "err", err)
-			return utils.FlowTypeUnsupported
-		}
-		matchingServiceName := getServiceName(conn.OriginalDestinationPort, services)
-		if matchingServiceName == "" {
-			return utils.FlowTypeUnsupported
-		}
-		return utils.FlowTypeFromExternal
+		return utils.FlowTypeUnsupported
 	}
 
 	if !dstIsPod {
@@ -427,11 +412,6 @@ func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 			// Skip exporting the Pod-to-External connection at the Egress Node if it's different from the Source Node
 			return nil
 		}
-	}
-
-	if conn.FlowType == utils.FlowTypeFromExternal {
-		klog.InfoS("flow is fromExternal", "conn", conn)
-		exp.fillServiceInfo(conn)
 	}
 
 	if err := exp.exporter.Export(conn); err != nil {
