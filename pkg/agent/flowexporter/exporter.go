@@ -16,12 +16,12 @@ package flowexporter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"net"
 	"time"
 
-	"github.com/go-errors/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -383,18 +383,20 @@ func getServiceName(port uint16, services []*corev1.Service) string {
 }
 
 // fillServiceInfo updates the given conn of type FlowTypeToExternal with the name of
-// the service whos port matches the destination port. If no match is found, an error is returned
+// the service whos port matches the destination port. An error is returned and error
+// messages are logged if no match is found or errors occurred retrieving services
 func (exp *FlowExporter) fillServiceInfo(conn *connection.Connection) error {
 	//TODO error check along the way
 	services, err := exp.serviceInformer.Lister().Services(conn.DestinationPodNamespace).List(labels.NewSelector())
 	if err != nil {
-		errorMessage := fmt.Errorf("Failed to find service info for connection %s. Failed to list services %w", conn, err)
-		klog.InfoS("Failed to find service info for connection", "error", errorMessage)
+		errorMessage := fmt.Errorf("Failed to list services %w", err)
+		klog.ErrorS(errorMessage, "Failed to find service info for connection", "connection", conn)
 		return errorMessage
 	}
 	matchingServiceName := getServiceName(conn.OriginalDestinationPort, services)
 	if matchingServiceName == "" {
-		return errors.Errorf("Failed to find service info for connection %s. No service with matching port found", conn)
+		errorMessage := errors.New("No service with matching port found")
+		klog.ErrorS(errorMessage, "Failed to find service info for connection", "connection", conn)
 	}
 	conn.DestinationServicePortName = matchingServiceName
 	return nil
