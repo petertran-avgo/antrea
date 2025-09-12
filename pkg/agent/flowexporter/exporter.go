@@ -368,18 +368,18 @@ func (exp *FlowExporter) fillEgressInfo(conn *connection.Connection) {
 }
 
 // getServiceName returns the name of the service from the set of services provided
-// which has the matching provided port. Empty string is returned if no service match
-// is found.
-func getServiceName(port uint16, services []*corev1.Service) string {
+// which has the matching provided port and the name of the port.
+// Empty strings are returned if no service match is found.
+func getServiceName(port uint16, services []*corev1.Service) (string, string) {
 	for _, service := range services {
 		for _, servicePort := range service.Spec.Ports {
 			if servicePort.NodePort == int32(port) {
-				return service.Name
+				return service.Name, servicePort.Name
 			}
 		}
 	}
 
-	return ""
+	return "", ""
 }
 
 // fillServiceInfo updates the given conn of type FlowTypeToExternal with the name of
@@ -393,12 +393,12 @@ func (exp *FlowExporter) fillServiceInfo(conn *connection.Connection) error {
 		klog.ErrorS(errorMessage, "Failed to find service info for connection", "connection", conn)
 		return errorMessage
 	}
-	matchingServiceName := getServiceName(conn.OriginalDestinationPort, services)
+	matchingServiceName, portName := getServiceName(conn.OriginalDestinationPort, services)
 	if matchingServiceName == "" {
 		errorMessage := errors.New("No service with matching port found")
 		klog.ErrorS(errorMessage, "Failed to find service info for connection", "connection", conn)
 	}
-	conn.DestinationServicePortName = matchingServiceName
+	conn.DestinationServicePortName = fmt.Sprintf("%s/%s:%s", conn.DestinationPodNamespace, matchingServiceName, portName)
 	return nil
 }
 
@@ -419,7 +419,10 @@ func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 	}
 
 	if conn.FlowType == utils.FlowTypeFromExternal {
-		exp.fillServiceInfo(conn)
+		err := exp.fillServiceInfo(conn)
+		if err != nil {
+			klog.Error(err)
+		}
 	}
 
 	if err := exp.exporter.Export(conn); err != nil {
