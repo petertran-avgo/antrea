@@ -336,10 +336,6 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection) uint8 {
 	}
 
 	if !srcIsPod {
-		exp.fillServiceInfo(&conn)
-		if conn.DestinationServicePortName != "" {
-			return utils.FlowTypeFromExternal
-		}
 		return utils.FlowTypeUnsupported
 	}
 
@@ -401,9 +397,15 @@ func (exp *FlowExporter) fillServiceInfo(conn *connection.Connection) {
 
 func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 	conn.FlowType = exp.findFlowType(*conn)
+
 	if conn.FlowType == utils.FlowTypeUnsupported {
 		klog.InfoS("Record not exported due to unsupported flowtype", "connection", conn)
-		return nil
+		exp.fillServiceInfo(conn)
+		if conn.DestinationServicePortName != "" {
+			conn.FlowType = utils.FlowTypeFromExternal
+		} else {
+			return nil
+		}
 	}
 	if conn.FlowType == utils.FlowTypeToExternal {
 		if conn.SourcePodNamespace != "" && conn.SourcePodName != "" {
@@ -412,9 +414,6 @@ func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 			// Skip exporting the Pod-to-External connection at the Egress Node if it's different from the Source Node
 			return nil
 		}
-	}
-	if conn.FlowType == utils.FlowTypeFromExternal {
-		exp.fillServiceInfo(conn)
 	}
 
 	if err := exp.exporter.Export(conn); err != nil {
