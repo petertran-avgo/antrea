@@ -403,6 +403,7 @@ func (exp *FlowExporter) fillServiceInfo(conn *connection.Connection) error {
 }
 
 func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
+	klog.InfoS("preparing to export connection", "connection", conn)
 	conn.FlowType = exp.findFlowType(*conn)
 
 	if conn.FlowType == utils.FlowTypeUnsupported {
@@ -413,6 +414,7 @@ func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 		if conn.SourcePodNamespace != "" && conn.SourcePodName != "" {
 			exp.fillEgressInfo(conn)
 		} else {
+			klog.InfoS("skipping toexternal connection bc sourcepod namespace and sourcepodname are empty", "connection", conn)
 			// Skip exporting the Pod-to-External connection at the Egress Node if it's different from the Source Node
 			return nil
 		}
