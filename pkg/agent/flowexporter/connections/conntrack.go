@@ -62,6 +62,7 @@ func filterAntreaConns(conns []*connection.Connection, nodeConfig *config.NodeCo
 			//continue
 		}
 		if srcIP == gwIPv6 || dstIP == gwIPv6 {
+			klog.InfoS("Skipping", "conn", conn)
 			continue
 		}
 
