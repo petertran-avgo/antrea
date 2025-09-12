@@ -52,6 +52,7 @@ func filterAntreaConns(conns []*connection.Connection, nodeConfig *config.NodeCo
 	for _, conn := range conns {
 		klog.InfoS("filtering", "conn", conn)
 		if conn.Zone != zoneFilter {
+			klog.InfoS("filtering out because of zoneFilter mismatch", "conn", conn, "zone", conn.Zone)
 			continue
 		}
 		srcIP := conn.FlowKey.SourceAddress
@@ -86,6 +87,7 @@ func filterAntreaConns(conns []*connection.Connection, nodeConfig *config.NodeCo
 			continue
 		}
 
+		klog.InfoS("filtering connections - this conn survived", "conn", conn)
 		filteredConns = append(filteredConns, conn)
 	}
 	return filteredConns
