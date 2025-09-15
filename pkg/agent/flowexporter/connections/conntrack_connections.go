@@ -227,6 +227,7 @@ func (cs *ConntrackConnectionStore) addNetworkPolicyMetadata(conn *connection.Co
 // AddOrUpdateConn updates the connection if it is already present, i.e., update timestamp, counters etc.,
 // or adds a new connection with the resolved K8s metadata.
 func (cs *ConntrackConnectionStore) AddOrUpdateConn(conn *connection.Connection) {
+	klog.InfoS("addorupdateconn received", "conn", conn)
 	conn.IsPresent = true
 	connKey := connection.NewConnectionKey(conn)
 
