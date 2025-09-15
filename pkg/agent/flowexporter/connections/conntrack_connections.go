@@ -258,7 +258,7 @@ func (cs *ConntrackConnectionStore) AddOrUpdateConn(conn *connection.Connection)
 					time.Now().Add(cs.connectionStore.expirePriorityQueue.IdleFlowTimeout))
 			}
 		}
-		klog.V(4).InfoS("Antrea flow updated", "connection", existingConn)
+		klog.InfoS("Antrea flow updated", "connection", existingConn)
 	} else {
 		cs.fillPodInfo(conn)
 		if conn.SourcePodName == "" && conn.DestinationPodName == "" {
@@ -289,7 +289,7 @@ func (cs *ConntrackConnectionStore) AddOrUpdateConn(conn *connection.Connection)
 		// Add new antrea connection to connection store and PQ.
 		cs.connections[connKey] = conn
 		cs.expirePriorityQueue.WriteItemToQueue(connKey, conn)
-		klog.V(4).InfoS("New Antrea flow added", "connection", conn)
+		klog.InfoS("New Antrea flow added", "connection", conn)
 	}
 }
 
