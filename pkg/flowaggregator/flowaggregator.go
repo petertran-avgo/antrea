@@ -518,6 +518,7 @@ func (fa *flowAggregator) flushExporters() error {
 }
 
 func (fa *flowAggregator) sendAggregatedRecord(key intermediate.FlowKey, record *intermediate.AggregationFlowRecord) error {
+	klog.InfoS("sendAggregatedRecord - received", "record", record)
 	isRecordIPv4 := fa.aggregationProcess.IsAggregatedRecordIPv4(*record)
 	startTime := record.Record.StartTs.AsTime()
 	if !fa.aggregationProcess.AreCorrelatedFieldsFilled(*record) {
