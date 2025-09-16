@@ -346,7 +346,7 @@ func (a *aggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record *fl
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
-	correlationRequired := isCorrelationRequired(record.K8S.FlowType, record)
+	correlationRequired := isCorrelationRequired(record)
 
 	currTime := a.clock.Now()
 	aggregationRecord, exist := a.flowKeyRecordMap[*flowKey]
@@ -763,7 +763,8 @@ func getFlowKeyFromRecord(record *flowpb.Flow) (*FlowKey, bool) {
 // isCorrelationRequired returns true for InterNode flowType when
 // either the egressNetworkPolicyRuleAction is not deny (drop/reject) or
 // the ingressNetworkPolicyRuleAction is not reject.
-func isCorrelationRequired(flowType flowpb.FlowType, record *flowpb.Flow) bool {
+func isCorrelationRequired(record *flowpb.Flow) bool {
+	flowType := record.K8S.FlowType
 	return flowType == flowpb.FlowType_FLOW_TYPE_INTER_NODE &&
 		record.K8S.EgressNetworkPolicyRuleAction != flowpb.NetworkPolicyRuleAction_NETWORK_POLICY_RULE_ACTION_DROP &&
 		record.K8S.EgressNetworkPolicyRuleAction != flowpb.NetworkPolicyRuleAction_NETWORK_POLICY_RULE_ACTION_REJECT &&

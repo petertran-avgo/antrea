@@ -783,3 +783,72 @@ func runAggregationAndCheckResult(t *testing.T, ap *aggregationProcess, clock *c
 	assert.EqualValues(t, 915, aggRecord.Record.Aggregation.ThroughputFromDestination)
 	assert.EqualValues(t, 915, aggRecord.Record.Aggregation.ReverseThroughputFromDestination)
 }
+
+// TestAggregateRecordsForExternalToPodFlows tests aggregating the records
+// created when external traffic reaches a pod
+//func TestAggregateRecordsForExternalToPodFlows(t *testing.T) {
+//	aggregationProcess := initAggregationProcessWithClock()
+//}
+
+// TestIsCorrelationRequired tests the correct checks for when a record
+// should or should not be correlated
+func TestIsCorrelationRequired(t *testing.T) {
+	testCases := []struct {
+		name                           string
+		flowType                       flowpb.FlowType
+		egressNetworkPolicyRuleAction  flowpb.NetworkPolicyRuleAction
+		ingressNetworkPolicyRuleAction flowpb.NetworkPolicyRuleAction
+		want                           bool
+	}{
+		{
+			name:     "unspecified flow types",
+			flowType: flowpb.FlowType_FLOW_TYPE_UNSPECIFIED,
+			want:     false,
+		},
+		{
+			name:                           "inter node flow type",
+			flowType:                       flowpb.FlowType_FLOW_TYPE_INTER_NODE,
+			egressNetworkPolicyRuleAction:  flowpb.NetworkPolicyRuleAction_NETWORK_POLICY_RULE_ACTION_NO_ACTION,
+			ingressNetworkPolicyRuleAction: flowpb.NetworkPolicyRuleAction_NETWORK_POLICY_RULE_ACTION_NO_ACTION,
+			want:                           true,
+		},
+		{
+			name:                           "inter node flow type - egress drop",
+			flowType:                       flowpb.FlowType_FLOW_TYPE_INTER_NODE,
+			egressNetworkPolicyRuleAction:  flowpb.NetworkPolicyRuleAction_NETWORK_POLICY_RULE_ACTION_DROP,
+			ingressNetworkPolicyRuleAction: flowpb.NetworkPolicyRuleAction_NETWORK_POLICY_RULE_ACTION_NO_ACTION,
+			want:                           false,
+		},
+		{
+			name:                           "inter node flow type - egress reject",
+			flowType:                       flowpb.FlowType_FLOW_TYPE_INTER_NODE,
+			egressNetworkPolicyRuleAction:  flowpb.NetworkPolicyRuleAction_NETWORK_POLICY_RULE_ACTION_REJECT,
+			ingressNetworkPolicyRuleAction: flowpb.NetworkPolicyRuleAction_NETWORK_POLICY_RULE_ACTION_NO_ACTION,
+			want:                           false,
+		},
+		{
+			name:                           "inter node flow type - ingrss reject",
+			flowType:                       flowpb.FlowType_FLOW_TYPE_INTER_NODE,
+			egressNetworkPolicyRuleAction:  flowpb.NetworkPolicyRuleAction_NETWORK_POLICY_RULE_ACTION_NO_ACTION,
+			ingressNetworkPolicyRuleAction: flowpb.NetworkPolicyRuleAction_NETWORK_POLICY_RULE_ACTION_REJECT,
+			want:                           false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			record := flowpb.Flow{
+				K8S: &flowpb.Kubernetes{
+					FlowType:                       tc.flowType,
+					EgressNetworkPolicyRuleAction:  tc.egressNetworkPolicyRuleAction,
+					IngressNetworkPolicyRuleAction: tc.ingressNetworkPolicyRuleAction,
+				},
+			}
+
+			if tc.want {
+				assert.True(t, isCorrelationRequired(&record))
+			} else {
+				assert.False(t, isCorrelationRequired(&record))
+			}
+		})
+	}
+}
