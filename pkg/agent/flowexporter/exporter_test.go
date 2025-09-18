@@ -445,6 +445,7 @@ func TestFlowExporter_findFlowType(t *testing.T) {
 	conn7 := connection.Connection{FlowKey: connection.Tuple{DestinationAddress: isPod, SourceAddress: isPod}}
 	conn8 := connection.Connection{SourcePodName: "source-pod-name", DestinationPodName: "destination-pod-name", FlowKey: connection.Tuple{DestinationAddress: isPod, SourceAddress: isPod}}
 	conn9 := connection.Connection{FlowKey: connection.Tuple{SourceAddress: isNotPod}}
+	conn10 := connection.Connection{FlowKey: connection.Tuple{SourceAddress: isNotPod, DestinationAddress: isPod}}
 
 	mockController := mockNodeRouteController{}
 	mockServiceLookUp := mockServiceLookUp{}
@@ -470,6 +471,7 @@ func TestFlowExporter_findFlowType(t *testing.T) {
 		{"pod names not missing", false, conn8, utils.FlowTypeIntraNode, mockController, nil},
 		{"service lookup is nil", false, conn9, utils.FlowTypeUnspecified, mockController, nilServiceLookUp},
 		{"service lookup succeeds", false, conn9, utils.FlowTypeFromExternal, mockController, mockServiceLookUp},
+		{"source is not pod but destination is", false, conn10, utils.FlowTypeFromExternal, mockController, mockServiceLookUpErrors},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			flowExp := &FlowExporter{

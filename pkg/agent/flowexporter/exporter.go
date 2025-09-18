@@ -360,7 +360,7 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteContr
 			klog.V(5).InfoS("Can't find flow type without serviceLookUp")
 			return utils.FlowTypeUnspecified
 		}
-		if err := serviceLookUp.FillServiceInfo(&conn); err == nil {
+		if err := serviceLookUp.FillServiceInfo(&conn); err == nil || dstIsPod {
 			return utils.FlowTypeFromExternal
 		}
 		return utils.FlowTypeUnsupported
