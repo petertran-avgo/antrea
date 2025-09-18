@@ -432,6 +432,7 @@ func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 
 	if conn.FlowType == utils.FlowTypeUnsupported {
 		klog.InfoS("Record not exported due to unsupported flowtype", "connection", conn)
+		return nil
 	}
 
 	if conn.FlowType == utils.FlowTypeToExternal {
