@@ -263,11 +263,13 @@ func (s *ObjectStore[T]) GetObjectByIndexAndTime(indexName, indexedValue string,
 	objects, _ := s.objects.ByIndex(indexName, indexedValue)
 	if len(objects) == 0 {
 		return *new(T), false
+		klog.InfoS("getting k8s obj but none found", "indexName", indexName, "indexedValue", indexedValue)
 	} else if len(objects) == 1 {
 		object := objects[0].(T)
 		// In case the clocks may be skewed between different Nodes in the cluster, we directly return the object if there is only
 		// one object in the indexer. Otherwise, we check the timestamp for objects in the indexer.
 		klog.V(4).InfoS("Matched object to object from indexer", "indexName", indexName, "indexedValue", indexedValue, "obj", klog.KObj(object))
+		klog.InfoS("getting k8s obj - one found", "indexName  found", indexName, "indexedValue", indexedValue)
 		return object, true
 	}
 	for _, obj := range objects {
