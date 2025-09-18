@@ -16,7 +16,9 @@ package flowexporter
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -39,6 +41,7 @@ import (
 	"antrea.io/antrea/pkg/agent/flowexporter/options"
 	"antrea.io/antrea/pkg/agent/flowexporter/priorityqueue"
 	flowexportertesting "antrea.io/antrea/pkg/agent/flowexporter/testing"
+	"antrea.io/antrea/pkg/agent/flowexporter/utils"
 	"antrea.io/antrea/pkg/agent/metrics"
 	agenttypes "antrea.io/antrea/pkg/agent/types"
 	queriertest "antrea.io/antrea/pkg/querier/testing"
@@ -387,23 +390,100 @@ func getNumOfDenyConns(connStore *connections.DenyConnectionStore) int {
 	return count
 }
 
+var (
+	isGateway, _ = netip.AddrFromSlice([]byte{9, 9, 9, 9})
+	isNotPod, _  = netip.AddrFromSlice([]byte{8, 8, 8, 8})
+	isPod, _     = netip.AddrFromSlice([]byte{7, 7, 7, 7})
+)
+
+type mockNodeRouteController struct{}
+
+func (m mockNodeRouteController) LookupIPInPodSubnets(ip netip.Addr) (bool, bool) {
+	if ip == isGateway {
+		return false, true
+	}
+	if ip == isPod {
+		return true, false
+	}
+	if ip == isNotPod {
+		return false, false
+	}
+	return false, false
+}
+
+func (m mockNodeRouteController) IsNil() bool {
+	return false
+}
+
+type mockServiceLookUp struct{}
+
+func (m mockServiceLookUp) IsNil() bool {
+	return false
+}
+
+func (m mockServiceLookUp) FillServiceInfo(conn *connection.Connection) error {
+	return nil
+}
+
+type mockServiceLookUpErrors struct{}
+
+func (m mockServiceLookUpErrors) IsNil() bool {
+	return false
+}
+
+func (m mockServiceLookUpErrors) FillServiceInfo(conn *connection.Connection) error {
+	return errors.New("error")
+}
+
 func TestFlowExporter_findFlowType(t *testing.T) {
 	conn1 := connection.Connection{SourcePodName: "podA", DestinationPodName: "podB"}
 	conn2 := connection.Connection{SourcePodName: "podA", DestinationPodName: ""}
+	conn3 := connection.Connection{FlowKey: connection.Tuple{SourceAddress: isGateway}}
+	conn4 := connection.Connection{FlowKey: connection.Tuple{DestinationAddress: isGateway}}
+	conn5 := connection.Connection{FlowKey: connection.Tuple{SourceAddress: isNotPod}}
+	conn6 := connection.Connection{FlowKey: connection.Tuple{DestinationAddress: isNotPod, SourceAddress: isPod}}
+	conn7 := connection.Connection{FlowKey: connection.Tuple{DestinationAddress: isPod, SourceAddress: isPod}}
+	conn8 := connection.Connection{SourcePodName: "source-pod-name", DestinationPodName: "destination-pod-name", FlowKey: connection.Tuple{DestinationAddress: isPod, SourceAddress: isPod}}
+	conn9 := connection.Connection{FlowKey: connection.Tuple{SourceAddress: isNotPod}}
+
+	mockController := mockNodeRouteController{}
+	mockServiceLookUp := mockServiceLookUp{}
+	mockServiceLookUpErrors := mockServiceLookUpErrors{}
+	var nilFlowExporter *FlowExporter = nil
+	var nilServiceLookUp serviceLookUpInterface = nilFlowExporter
 	for _, tc := range []struct {
-		isNetworkPolicyOnly bool
-		conn                connection.Connection
-		expectedFlowType    uint8
+		name                              string
+		isNetworkPolicyOnly               bool
+		conn                              connection.Connection
+		expectedFlowType                  uint8
+		nodeRouteControllerImplementation nodeRouteControllerInterface
+		serviceLookUpImplementation       serviceLookUpInterface
 	}{
-		{true, conn1, 1},
-		{true, conn2, 2},
-		{false, conn1, 0},
+		{"isNetworkPolicy and pod names exist", true, conn1, utils.FlowTypeIntraNode, nil, nil},
+		{"isNetworkPolicy and pod names are missing", true, conn2, utils.FlowTypeInterNode, nil, nil},
+		{"unspecified flow type", false, conn1, utils.FlowTypeUnspecified, nil, nil},
+		{"source is gateway", false, conn3, utils.FlowTypeUnsupported, mockController, nil},
+		{"destination is gateway", false, conn4, utils.FlowTypeUnsupported, mockController, nil},
+		{"source is not pod", false, conn5, utils.FlowTypeUnsupported, mockController, mockServiceLookUpErrors},
+		{"destination is not pod", false, conn6, utils.FlowTypeToExternal, mockController, nil},
+		{"pod names missing", false, conn7, utils.FlowTypeInterNode, mockController, nil},
+		{"pod names not missing", false, conn8, utils.FlowTypeIntraNode, mockController, nil},
+		{"service lookup is nil", false, conn9, utils.FlowTypeUnspecified, mockController, nilServiceLookUp},
+		{"service lookup succeeds", false, conn9, utils.FlowTypeFromExternal, mockController, mockServiceLookUp},
 	} {
-		flowExp := &FlowExporter{
-			isNetworkPolicyOnly: tc.isNetworkPolicyOnly,
-		}
-		flowType := flowExp.findFlowType(tc.conn)
-		assert.Equal(t, tc.expectedFlowType, flowType)
+		t.Run(tc.name, func(t *testing.T) {
+			flowExp := &FlowExporter{
+				isNetworkPolicyOnly: tc.isNetworkPolicyOnly,
+			}
+			var serviceLookUpImplementation serviceLookUpInterface
+			if tc.serviceLookUpImplementation == nil {
+				serviceLookUpImplementation = flowExp
+			} else {
+				serviceLookUpImplementation = tc.serviceLookUpImplementation
+			}
+			flowType := flowExp.findFlowType(tc.conn, tc.nodeRouteControllerImplementation, serviceLookUpImplementation)
+			assert.Equal(t, tc.expectedFlowType, flowType)
+		})
 	}
 }
 

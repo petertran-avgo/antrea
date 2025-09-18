@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"net"
+	"net/netip"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -314,7 +315,23 @@ func (exp *FlowExporter) initFlowExporter(ctx context.Context) error {
 	return nil
 }
 
-func (exp *FlowExporter) findFlowType(conn connection.Connection) uint8 {
+// ipLookUpInterface is an abstraction for nodeRouteController for dependency injection
+type nodeRouteControllerInterface interface {
+	LookupIPInPodSubnets(ip netip.Addr) (bool, bool)
+	IsNil() bool
+}
+
+// serviceLookUp is an abstraction for FlowExporter for dependency injection
+type serviceLookUpInterface interface {
+	IsNil() bool
+	FillServiceInfo(*connection.Connection) error
+}
+
+func (exp *FlowExporter) IsNil() bool {
+	return exp == nil
+}
+
+func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteController nodeRouteControllerInterface, serviceLookUp serviceLookUpInterface) uint8 {
 	// TODO: support Pod-To-External flows in network policy only mode.
 	if exp.isNetworkPolicyOnly {
 		if conn.SourcePodName == "" || conn.DestinationPodName == "" {
@@ -323,12 +340,14 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection) uint8 {
 		return utils.FlowTypeIntraNode
 	}
 
-	if exp.nodeRouteController == nil {
+	// The interface can have non nil pointer but nil value so checking both is required
+	if nodeRouteController == nil || nodeRouteController.IsNil() {
 		klog.V(5).InfoS("Can't find flow type without nodeRouteController")
 		return utils.FlowTypeUnspecified
 	}
-	srcIsPod, srcIsGw := exp.nodeRouteController.LookupIPInPodSubnets(conn.FlowKey.SourceAddress)
-	dstIsPod, dstIsGw := exp.nodeRouteController.LookupIPInPodSubnets(conn.FlowKey.DestinationAddress)
+
+	srcIsPod, srcIsGw := nodeRouteController.LookupIPInPodSubnets(conn.FlowKey.SourceAddress)
+	dstIsPod, dstIsGw := nodeRouteController.LookupIPInPodSubnets(conn.FlowKey.DestinationAddress)
 	if srcIsGw || dstIsGw {
 		// This matches what we do in filterAntreaConns but is more general as we consider
 		// remote gateways as well.
@@ -337,7 +356,11 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection) uint8 {
 	}
 
 	if !srcIsPod {
-		if err := exp.fillServiceInfo(&conn); err == nil {
+		if serviceLookUp == nil || serviceLookUp.IsNil() {
+			klog.V(5).InfoS("Can't find flow type without serviceLookUp")
+			return utils.FlowTypeUnspecified
+		}
+		if err := serviceLookUp.FillServiceInfo(&conn); err == nil {
 			return utils.FlowTypeFromExternal
 		}
 		return utils.FlowTypeUnsupported
@@ -346,6 +369,7 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection) uint8 {
 	if !dstIsPod {
 		return utils.FlowTypeToExternal
 	}
+
 	if conn.SourcePodName == "" || conn.DestinationPodName == "" {
 		return utils.FlowTypeInterNode
 	}
@@ -382,10 +406,10 @@ func getServiceName(port uint16, services []*corev1.Service) (string, string) {
 	return "", ""
 }
 
-// fillServiceInfo updates the given conn of type FlowTypeToExternal with the name of
+// FillServiceInfo updates the given conn of type FlowTypeToExternal with the name of
 // the service whos port matches the destination port. An error is returned and error
 // messages are logged if no match is found or errors occurred retrieving services
-func (exp *FlowExporter) fillServiceInfo(conn *connection.Connection) error {
+func (exp *FlowExporter) FillServiceInfo(conn *connection.Connection) error {
 	//TODO error check along the way
 	services, err := exp.serviceInformer.Lister().Services(conn.DestinationPodNamespace).List(labels.NewSelector())
 	if err != nil {
@@ -404,7 +428,7 @@ func (exp *FlowExporter) fillServiceInfo(conn *connection.Connection) error {
 
 func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 	klog.InfoS("preparing to export connection", "connection", conn)
-	conn.FlowType = exp.findFlowType(*conn)
+	conn.FlowType = exp.findFlowType(*conn, exp.nodeRouteController, exp)
 
 	if conn.FlowType == utils.FlowTypeUnsupported {
 		klog.InfoS("Record not exported due to unsupported flowtype", "connection", conn)
@@ -421,7 +445,7 @@ func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 	}
 
 	if conn.FlowType == utils.FlowTypeFromExternal {
-		err := exp.fillServiceInfo(conn)
+		err := exp.FillServiceInfo(conn)
 		if err != nil {
 			klog.Error(err)
 		}
