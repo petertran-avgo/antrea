@@ -262,8 +262,8 @@ func (s *ObjectStore[T]) GetObjectByIndexAndTime(indexName, indexedValue string,
 
 	objects, _ := s.objects.ByIndex(indexName, indexedValue)
 	if len(objects) == 0 {
-		return *new(T), false
 		klog.InfoS("getting k8s obj but none found", "indexName", indexName, "indexedValue", indexedValue)
+		return *new(T), false
 	} else if len(objects) == 1 {
 		object := objects[0].(T)
 		// In case the clocks may be skewed between different Nodes in the cluster, we directly return the object if there is only
