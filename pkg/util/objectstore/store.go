@@ -272,6 +272,7 @@ func (s *ObjectStore[T]) GetObjectByIndexAndTime(indexName, indexedValue string,
 		klog.InfoS("getting k8s obj - one found", "indexName  found", indexName, "indexedValue", indexedValue)
 		return object, true
 	}
+	klog.InfoS("getting k8s obj - one found", "indexName  found", indexName, "indexedValue", indexedValue)
 	for _, obj := range objects {
 		object := obj.(T)
 		timestamp, ok := s.timestampMap[object.GetUID()]
@@ -283,6 +284,7 @@ func (s *ObjectStore[T]) GetObjectByIndexAndTime(indexName, indexedValue string,
 			return object, true
 		}
 	}
+	klog.InfoS("getting k8s obj - found >1 but failed all failed timestampmap lookup", "indexName  found", indexName, "indexedValue", indexedValue)
 	return *new(T), false
 }
 
