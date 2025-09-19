@@ -351,6 +351,7 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteContr
 	if srcIsGw || dstIsGw {
 		// This matches what we do in filterAntreaConns but is more general as we consider
 		// remote gateways as well.
+		klog.InfoS("flow is unsupported because src/dst is gateway", "srcIsGw", srcIsGw, "dstIsGw", dstIsGw, "conn", conn)
 		klog.V(5).InfoS("Flows where the source or destination IP is a gateway IP will not be exported")
 		return utils.FlowTypeUnsupported
 	}
@@ -363,6 +364,7 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteContr
 		if err := serviceLookUp.FillServiceInfo(&conn); err == nil || dstIsPod {
 			return utils.FlowTypeFromExternal
 		}
+		klog.InfoS("flow is unsupported because src is not a pod and no service matches found", "conn", conn)
 		return utils.FlowTypeUnsupported
 	}
 
