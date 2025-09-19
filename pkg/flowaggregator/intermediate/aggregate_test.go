@@ -387,6 +387,126 @@ func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
 	runCorrelationAndCheckResult(t, ap, clock, record1, nil, true, flowpb.FlowType_FLOW_TYPE_TO_EXTERNAL, false)
 }
 
+// TestCorrelateRecordsForFromExternalFlow validates flows received by the FlowAggregator
+// are correctly correlated as they come from 2 zones with different information
+func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
+	recordChan := make(chan *flowpb.Flow)
+	input := AggregationInput{
+		RecordChan:            recordChan,
+		WorkerNum:             2,
+		ActiveExpiryTimeout:   testActiveExpiry,
+		InactiveExpiryTimeout: testInactiveExpiry,
+	}
+	clock := clocktesting.NewFakeClock(time.Now())
+	ap, _ := initAggregationProcessWithClock(input, clock)
+	// Test IPv4 fields.
+	// Test the scenario, where record1 is added first and then record2.
+	destinationPodName := "nginx-deployment-HASH"
+	recordFromAntreaZone := &flowpb.Flow{
+		K8S: &flowpb.Kubernetes{
+			DestinationPodName: destinationPodName,
+			FlowType:           flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
+		},
+		Ip: &flowpb.IP{
+			Source:      []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
+			Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
+		},
+		Transport: &flowpb.Transport{
+			ProtocolNumber:  6,
+			SourcePort:      13914,
+			DestinationPort: 80,
+		},
+		Stats:        &flowpb.Stats{},
+		ReverseStats: &flowpb.Stats{},
+		StartTs:      timestamppb.New(time.Time{}),
+		EndTs:        timestamppb.New(time.Time{}),
+	}
+	flowKeyFromAntreaZone, _ := getFlowKeyFromRecord(recordFromAntreaZone)
+	recordFromZoneZero := &flowpb.Flow{
+		K8S: &flowpb.Kubernetes{
+			DestinationServicePortName: "service-namespace/service-name:service-port-name",
+			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
+		},
+		Ip: &flowpb.IP{
+			Source:      []byte{0xac, 0x12, 0x00, 0x01}, // 172.18.0.1
+			Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
+		},
+		Transport: &flowpb.Transport{
+			ProtocolNumber:  6,
+			SourcePort:      50634,
+			DestinationPort: 80,
+		},
+		Stats:        &flowpb.Stats{},
+		ReverseStats: &flowpb.Stats{},
+		StartTs:      timestamppb.New(time.Time{}),
+		EndTs:        timestamppb.New(time.Time{}),
+	}
+	flowKeyFromZoneZero, _ := getFlowKeyFromRecord(recordFromZoneZero)
+	ap.addOrUpdateRecordInMap(flowKeyFromZoneZero, recordFromZoneZero, false)
+	ap.addOrUpdateRecordInMap(flowKeyFromAntreaZone, recordFromAntreaZone, false)
+	assert.Equal(t, destinationPodName, recordFromZoneZero.K8S.DestinationPodName)
+}
+
+// / TODO merge test with above
+func TestCorrelateRecordsForFromExternalFlow2(t *testing.T) {
+	recordChan := make(chan *flowpb.Flow)
+	input := AggregationInput{
+		RecordChan:            recordChan,
+		WorkerNum:             2,
+		ActiveExpiryTimeout:   testActiveExpiry,
+		InactiveExpiryTimeout: testInactiveExpiry,
+	}
+	clock := clocktesting.NewFakeClock(time.Now())
+	ap, _ := initAggregationProcessWithClock(input, clock)
+	// Test IPv4 fields.
+	// Test the scenario, where record1 is added first and then record2.
+	destinationPodName := "nginx-deployment-HASH"
+	recordFromAntreaZone := &flowpb.Flow{
+		K8S: &flowpb.Kubernetes{
+			DestinationPodName: destinationPodName,
+			FlowType:           flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
+		},
+		Ip: &flowpb.IP{
+			Source:      []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
+			Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
+		},
+		Transport: &flowpb.Transport{
+			ProtocolNumber:  6,
+			SourcePort:      13914,
+			DestinationPort: 80,
+		},
+		Stats:        &flowpb.Stats{},
+		ReverseStats: &flowpb.Stats{},
+		StartTs:      timestamppb.New(time.Time{}),
+		EndTs:        timestamppb.New(time.Time{}),
+	}
+	flowKeyFromAntreaZone, _ := getFlowKeyFromRecord(recordFromAntreaZone)
+	recordFromZoneZero := &flowpb.Flow{
+		K8S: &flowpb.Kubernetes{
+			DestinationServicePortName: "service-namespace/service-name:service-port-name",
+			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
+		},
+		Ip: &flowpb.IP{
+			Source:      []byte{0xac, 0x12, 0x00, 0x01}, // 172.18.0.1
+			Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
+		},
+		Transport: &flowpb.Transport{
+			ProtocolNumber:  6,
+			SourcePort:      50634,
+			DestinationPort: 80,
+		},
+		Stats:        &flowpb.Stats{},
+		ReverseStats: &flowpb.Stats{},
+		StartTs:      timestamppb.New(time.Time{}),
+		EndTs:        timestamppb.New(time.Time{}),
+	}
+	flowKeyFromZoneZero, _ := getFlowKeyFromRecord(recordFromZoneZero)
+	// Order reversed
+	ap.addOrUpdateRecordInMap(flowKeyFromAntreaZone, recordFromAntreaZone, false)
+	ap.addOrUpdateRecordInMap(flowKeyFromZoneZero, recordFromZoneZero, false)
+	assert.Equal(t, destinationPodName, recordFromZoneZero.K8S.DestinationPodName)
+}
+
 func TestAggregateRecordsForInterNodeFlow(t *testing.T) {
 	recordChan := make(chan *flowpb.Flow)
 	input := AggregationInput{

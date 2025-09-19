@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -60,6 +61,9 @@ type aggregationProcess struct {
 	// stopChan is the channel to receive stop message
 	stopChan chan bool
 	clock    clock.Clock
+	// FromExternalIPPortMap stores records with FlowType "FromExternal" with key
+	// being the destination ip and port
+	FromExternalIPPortMap map[string]*AggregationFlowRecord
 }
 
 type AggregationInput struct {
@@ -87,6 +91,7 @@ func initAggregationProcessWithClock(input AggregationInput, clock clock.Clock) 
 		input.InactiveExpiryTimeout,
 		make(chan bool),
 		clock,
+		make(map[string]*AggregationFlowRecord),
 	}, nil
 }
 
@@ -340,11 +345,35 @@ func (a *aggregationProcess) IsAggregatedRecordIPv4(record AggregationFlowRecord
 	return record.isIPv4
 }
 
+func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, record *flowpb.Flow) {
+	key := string(record.Ip.Destination) + strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
+	aggregationRecord, exists := a.FromExternalIPPortMap[key]
+	if exists {
+		if aggregationRecord.Record.K8S.DestinationPodName == "" {
+			aggregationRecord.Record.K8S.DestinationPodName = record.K8S.DestinationPodName
+		} else {
+			record.K8S.DestinationPodName = aggregationRecord.Record.K8S.DestinationPodName
+		}
+	} else {
+		aggregationRecord := &AggregationFlowRecord{
+			Record:                    record,
+			ReadyToSend:               false,
+			waitForReadyToSendRetries: 0,
+			isIPv4:                    false,
+		}
+		a.FromExternalIPPortMap[key] = aggregationRecord
+	}
+}
+
 // addOrUpdateRecordInMap either adds the record to flowKeyMap or updates the record in
 // flowKeyMap by doing correlation or updating the stats.
 func (a *aggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record *flowpb.Flow, isIPv4 bool) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
+
+	if record.K8S.FlowType == flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL {
+		a.addOrUpdateFromExternalRecord(flowKey, record)
+	}
 
 	correlationRequired := isCorrelationRequired(record)
 
