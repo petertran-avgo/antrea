@@ -789,12 +789,12 @@ func getFlowKeyFromRecord(record *flowpb.Flow) (*FlowKey, bool) {
 	return flowKey, record.Ip.Version == flowpb.IPVersion_IP_VERSION_4
 }
 
-// isCorrelationRequired returns true for FromExternal flowtype or InterNode flowType when
+// isCorrelationRequired returns true for InterNode flowType when
 // either the egressNetworkPolicyRuleAction is not deny (drop/reject) or
 // the ingressNetworkPolicyRuleAction is not reject.
 func isCorrelationRequired(record *flowpb.Flow) bool {
 	flowType := record.K8S.FlowType
-	return flowType == flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL || flowType == flowpb.FlowType_FLOW_TYPE_INTER_NODE &&
+	return flowType == flowpb.FlowType_FLOW_TYPE_INTER_NODE &&
 		record.K8S.EgressNetworkPolicyRuleAction != flowpb.NetworkPolicyRuleAction_NETWORK_POLICY_RULE_ACTION_DROP &&
 		record.K8S.EgressNetworkPolicyRuleAction != flowpb.NetworkPolicyRuleAction_NETWORK_POLICY_RULE_ACTION_REJECT &&
 		record.K8S.IngressNetworkPolicyRuleAction != flowpb.NetworkPolicyRuleAction_NETWORK_POLICY_RULE_ACTION_REJECT
