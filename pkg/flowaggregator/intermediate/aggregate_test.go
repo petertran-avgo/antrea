@@ -833,6 +833,11 @@ func TestIsCorrelationRequired(t *testing.T) {
 			ingressNetworkPolicyRuleAction: flowpb.NetworkPolicyRuleAction_NETWORK_POLICY_RULE_ACTION_REJECT,
 			want:                           false,
 		},
+		{
+			name:     "from external flow type",
+			flowType: flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
+			want:     true,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
