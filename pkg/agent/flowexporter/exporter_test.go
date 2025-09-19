@@ -463,7 +463,7 @@ func TestFlowExporter_findFlowType(t *testing.T) {
 		{"isNetworkPolicy and pod names exist", true, conn1, utils.FlowTypeIntraNode, nil, nil},
 		{"isNetworkPolicy and pod names are missing", true, conn2, utils.FlowTypeInterNode, nil, nil},
 		{"unspecified flow type", false, conn1, utils.FlowTypeUnspecified, nil, nil},
-		{"source is gateway", false, conn3, utils.FlowTypeUnsupported, mockController, nil},
+		{"source is gateway", false, conn3, utils.FlowTypeFromExternal, mockController, nil},
 		{"destination is gateway", false, conn4, utils.FlowTypeUnsupported, mockController, nil},
 		{"source is not pod", false, conn5, utils.FlowTypeUnsupported, mockController, mockServiceLookUpErrors},
 		{"destination is not pod", false, conn6, utils.FlowTypeToExternal, mockController, nil},
