@@ -402,7 +402,7 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 	// Test IPv4 fields.
 	// Test the scenario, where record1 is added first and then record2.
 	destinationPodName := "nginx-deployment-HASH"
-	recordFromAntreaZone := &flowpb.Flow{
+	fromGatewayRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
 			DestinationPodName: destinationPodName,
 			FlowType:           flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
@@ -421,8 +421,8 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		StartTs:      timestamppb.New(time.Time{}),
 		EndTs:        timestamppb.New(time.Time{}),
 	}
-	flowKeyFromAntreaZone, _ := getFlowKeyFromRecord(recordFromAntreaZone)
-	recordFromZoneZero := &flowpb.Flow{
+	flowKeyFromGateway, _ := getFlowKeyFromRecord(fromGatewayRecord)
+	toGatewayRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
 			DestinationServicePortName: "service-namespace/service-name:service-port-name",
 			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
@@ -441,10 +441,15 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		StartTs:      timestamppb.New(time.Time{}),
 		EndTs:        timestamppb.New(time.Time{}),
 	}
-	flowKeyFromZoneZero, _ := getFlowKeyFromRecord(recordFromZoneZero)
-	ap.addOrUpdateRecordInMap(flowKeyFromZoneZero, recordFromZoneZero, false)
-	ap.addOrUpdateRecordInMap(flowKeyFromAntreaZone, recordFromAntreaZone, false)
-	assert.Equal(t, destinationPodName, recordFromZoneZero.K8S.DestinationPodName)
+	flowKeyToGateway, _ := getFlowKeyFromRecord(toGatewayRecord)
+	ap.addOrUpdateRecordInMap(flowKeyToGateway, toGatewayRecord, false)
+	assert.NotNil(t, toGatewayRecord.Aggregation)
+	assert.Equal(t, 1, len(ap.expirePriorityQueue))
+	assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
+
+	ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
+	assert.Equal(t, destinationPodName, toGatewayRecord.K8S.DestinationPodName)
+	assert.Equal(t, 1, len(ap.expirePriorityQueue))
 }
 
 // / TODO merge test with above
@@ -461,7 +466,7 @@ func TestCorrelateRecordsForFromExternalFlow2(t *testing.T) {
 	// Test IPv4 fields.
 	// Test the scenario, where record1 is added first and then record2.
 	destinationPodName := "nginx-deployment-HASH"
-	recordFromAntreaZone := &flowpb.Flow{
+	fromGatewayRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
 			DestinationPodName: destinationPodName,
 			FlowType:           flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
@@ -480,8 +485,8 @@ func TestCorrelateRecordsForFromExternalFlow2(t *testing.T) {
 		StartTs:      timestamppb.New(time.Time{}),
 		EndTs:        timestamppb.New(time.Time{}),
 	}
-	flowKeyFromAntreaZone, _ := getFlowKeyFromRecord(recordFromAntreaZone)
-	recordFromZoneZero := &flowpb.Flow{
+	flowKeyFromGateway, _ := getFlowKeyFromRecord(fromGatewayRecord)
+	toGatewayRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
 			DestinationServicePortName: "service-namespace/service-name:service-port-name",
 			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
@@ -500,11 +505,17 @@ func TestCorrelateRecordsForFromExternalFlow2(t *testing.T) {
 		StartTs:      timestamppb.New(time.Time{}),
 		EndTs:        timestamppb.New(time.Time{}),
 	}
-	flowKeyFromZoneZero, _ := getFlowKeyFromRecord(recordFromZoneZero)
-	// Order reversed
-	ap.addOrUpdateRecordInMap(flowKeyFromAntreaZone, recordFromAntreaZone, false)
-	ap.addOrUpdateRecordInMap(flowKeyFromZoneZero, recordFromZoneZero, false)
-	assert.Equal(t, destinationPodName, recordFromZoneZero.K8S.DestinationPodName)
+	flowKeyToGateway, _ := getFlowKeyFromRecord(toGatewayRecord)
+
+	ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
+	assert.Nil(t, fromGatewayRecord.Aggregation)
+
+	assert.Equal(t, 0, len(ap.expirePriorityQueue))
+	assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
+
+	ap.addOrUpdateRecordInMap(flowKeyToGateway, toGatewayRecord, false)
+	assert.Equal(t, destinationPodName, toGatewayRecord.K8S.DestinationPodName)
+	assert.Equal(t, 1, len(ap.expirePriorityQueue))
 }
 
 func TestAggregateRecordsForInterNodeFlow(t *testing.T) {

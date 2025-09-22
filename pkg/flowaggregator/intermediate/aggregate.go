@@ -63,7 +63,7 @@ type aggregationProcess struct {
 	clock    clock.Clock
 	// FromExternalIPPortMap stores records with FlowType "FromExternal" with key
 	// being the destination ip and port
-	FromExternalIPPortMap map[string]*AggregationFlowRecord
+	FromExternalIPPortMap map[string]*FromExternalFlowStash
 }
 
 type AggregationInput struct {
@@ -71,6 +71,12 @@ type AggregationInput struct {
 	WorkerNum             int
 	ActiveExpiryTimeout   time.Duration
 	InactiveExpiryTimeout time.Duration
+}
+
+// Holds the two records that make up the FromExternal records
+type FromExternalFlowStash struct {
+	ToGateway   *AggregationFlowRecord
+	FromGateway *AggregationFlowRecord
 }
 
 func initAggregationProcessWithClock(input AggregationInput, clock clock.Clock) (*aggregationProcess, error) {
@@ -91,7 +97,7 @@ func initAggregationProcessWithClock(input AggregationInput, clock clock.Clock) 
 		input.InactiveExpiryTimeout,
 		make(chan bool),
 		clock,
-		make(map[string]*AggregationFlowRecord),
+		make(map[string]*FromExternalFlowStash),
 	}, nil
 }
 
@@ -345,23 +351,53 @@ func (a *aggregationProcess) IsAggregatedRecordIPv4(record AggregationFlowRecord
 	return record.isIPv4
 }
 
+func isToGateway(record *flowpb.Flow) bool {
+	return record.K8S.DestinationPodName == ""
+}
+
 func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, record *flowpb.Flow) {
 	key := string(record.Ip.Destination) + strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
-	aggregationRecord, exists := a.FromExternalIPPortMap[key]
+	stash, exists := a.FromExternalIPPortMap[key]
 	if exists {
-		if aggregationRecord.Record.K8S.DestinationPodName == "" {
-			aggregationRecord.Record.K8S.DestinationPodName = record.K8S.DestinationPodName
+		if isToGateway(record) {
+			record.K8S.DestinationPodName = stash.FromGateway.Record.K8S.DestinationPodName
+			pqItem := &ItemToExpire{
+				flowKey: flowKey,
+			}
+			heap.Push(&a.expirePriorityQueue, pqItem)
 		} else {
-			record.K8S.DestinationPodName = aggregationRecord.Record.K8S.DestinationPodName
+			aggregationRecord := stash.ToGateway
+			aggregationRecord.Record.K8S.DestinationPodName = record.K8S.DestinationPodName
 		}
 	} else {
-		aggregationRecord := &AggregationFlowRecord{
-			Record:                    record,
-			ReadyToSend:               false,
-			waitForReadyToSendRetries: 0,
-			isIPv4:                    false,
+		if isToGateway(record) {
+			record.Aggregation = &flowpb.Aggregation{}
+			aggregationRecord := &AggregationFlowRecord{
+				Record:                    record,
+				ReadyToSend:               false,
+				waitForReadyToSendRetries: 0,
+				isIPv4:                    false,
+			}
+
+			pqItem := &ItemToExpire{
+				flowKey: flowKey,
+			}
+			//aggregationRecord.PriorityQueueItem = pqItem
+
+			//pqItem.flowRecord = aggregationRecord
+			//pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
+			//pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
+			heap.Push(&a.expirePriorityQueue, pqItem)
+			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{ToGateway: aggregationRecord}
+		} else {
+			aggregationRecord := &AggregationFlowRecord{
+				Record:                    record,
+				ReadyToSend:               false,
+				waitForReadyToSendRetries: 0,
+				isIPv4:                    false,
+			}
+			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{FromGateway: aggregationRecord}
 		}
-		a.FromExternalIPPortMap[key] = aggregationRecord
 	}
 }
 
@@ -373,6 +409,7 @@ func (a *aggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record *fl
 
 	if record.K8S.FlowType == flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL {
 		a.addOrUpdateFromExternalRecord(flowKey, record)
+		return
 	}
 
 	correlationRequired := isCorrelationRequired(record)
