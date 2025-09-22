@@ -358,6 +358,7 @@ func isToGateway(record *flowpb.Flow) bool {
 func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, record *flowpb.Flow) {
 	key := string(record.Ip.Destination) + strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
 	stash, exists := a.FromExternalIPPortMap[key]
+	klog.InfoS("received FromExternal record", "record", record)
 	if exists {
 		if isToGateway(record) {
 			record.K8S.DestinationPodName = stash.FromGateway.Record.K8S.DestinationPodName
