@@ -460,10 +460,12 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 		assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
 		assert.NotNil(t, ap.expirePriorityQueue.Peek().flowRecord)
+		assert.False(t, ap.expirePriorityQueue.Peek().flowRecord.ReadyToSend)
 
 		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
 		assert.Equal(t, destinationPodName, toGatewayRecord.K8S.DestinationPodName)
 		assert.Equal(t, 1, len(ap.expirePriorityQueue))
+		assert.True(t, ap.expirePriorityQueue.Peek().flowRecord.ReadyToSend)
 	})
 
 	t.Run("fromGateway arrives first", func(t *testing.T) {
@@ -482,7 +484,6 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 
 		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
 		assert.Nil(t, fromGatewayRecord.Aggregation)
-
 		assert.Equal(t, 0, len(ap.expirePriorityQueue))
 		assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
 
@@ -490,6 +491,7 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.Equal(t, destinationPodName, toGatewayRecord.K8S.DestinationPodName)
 		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 		assert.NotNil(t, ap.expirePriorityQueue.Peek().flowRecord)
+		assert.True(t, ap.expirePriorityQueue.Peek().flowRecord.ReadyToSend)
 	})
 
 	t.Run("toGateway arrives multiple times", func(t *testing.T) {

@@ -370,7 +370,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				}
 				aggregationRecord := &AggregationFlowRecord{
 					Record:                    record,
-					ReadyToSend:               false,
+					ReadyToSend:               true,
 					waitForReadyToSendRetries: 0,
 					isIPv4:                    false,
 				}
@@ -381,6 +381,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			if stash.ToGateway != nil {
 				aggregationRecord := stash.ToGateway
 				aggregationRecord.Record.K8S.DestinationPodName = record.K8S.DestinationPodName
+				aggregationRecord.ReadyToSend = true
 			}
 		}
 	} else {
