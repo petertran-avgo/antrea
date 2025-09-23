@@ -387,135 +387,141 @@ func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
 	runCorrelationAndCheckResult(t, ap, clock, record1, nil, true, flowpb.FlowType_FLOW_TYPE_TO_EXTERNAL, false)
 }
 
+var destinationPodName = "nginx-deployment-HASH"
+
+func generateToGatewayFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
+	toGatewayRecord := &flowpb.Flow{
+		K8S: &flowpb.Kubernetes{
+			DestinationServicePortName: "service-namespace/service-name:service-port-name",
+			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
+		},
+		Ip: &flowpb.IP{
+			Source:      []byte{0xac, 0x12, 0x00, 0x01}, // 172.18.0.1
+			Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
+		},
+		Transport: &flowpb.Transport{
+			ProtocolNumber:  6,
+			SourcePort:      50634,
+			DestinationPort: 80,
+		},
+		Stats:        &flowpb.Stats{},
+		ReverseStats: &flowpb.Stats{},
+		StartTs:      timestamppb.New(time.Time{}),
+		EndTs:        timestamppb.New(time.Time{}),
+	}
+	flowKeyToGateway, _ := getFlowKeyFromRecord(toGatewayRecord)
+	return toGatewayRecord, flowKeyToGateway
+}
+func generateFromGatewayFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
+	fromGatewayRecord := &flowpb.Flow{
+		K8S: &flowpb.Kubernetes{
+			DestinationPodName: destinationPodName,
+			FlowType:           flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
+		},
+		Ip: &flowpb.IP{
+			Source:      []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
+			Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
+		},
+		Transport: &flowpb.Transport{
+			ProtocolNumber:  6,
+			SourcePort:      13914,
+			DestinationPort: 80,
+		},
+		Stats:        &flowpb.Stats{},
+		ReverseStats: &flowpb.Stats{},
+		StartTs:      timestamppb.New(time.Time{}),
+		EndTs:        timestamppb.New(time.Time{}),
+	}
+	flowKeyFromGateway, _ := getFlowKeyFromRecord(fromGatewayRecord)
+	return fromGatewayRecord, flowKeyFromGateway
+}
+
 // TestCorrelateRecordsForFromExternalFlow validates flows received by the FlowAggregator
 // are correctly correlated as they come from 2 zones with different information
 func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
-	recordChan := make(chan *flowpb.Flow)
-	input := AggregationInput{
-		RecordChan:            recordChan,
-		WorkerNum:             2,
-		ActiveExpiryTimeout:   testActiveExpiry,
-		InactiveExpiryTimeout: testInactiveExpiry,
-	}
-	clock := clocktesting.NewFakeClock(time.Now())
-	ap, _ := initAggregationProcessWithClock(input, clock)
 	// Test IPv4 fields.
 	// Test the scenario, where record1 is added first and then record2.
-	destinationPodName := "nginx-deployment-HASH"
-	fromGatewayRecord := &flowpb.Flow{
-		K8S: &flowpb.Kubernetes{
-			DestinationPodName: destinationPodName,
-			FlowType:           flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
-		},
-		Ip: &flowpb.IP{
-			Source:      []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
-			Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
-		},
-		Transport: &flowpb.Transport{
-			ProtocolNumber:  6,
-			SourcePort:      13914,
-			DestinationPort: 80,
-		},
-		Stats:        &flowpb.Stats{},
-		ReverseStats: &flowpb.Stats{},
-		StartTs:      timestamppb.New(time.Time{}),
-		EndTs:        timestamppb.New(time.Time{}),
-	}
-	flowKeyFromGateway, _ := getFlowKeyFromRecord(fromGatewayRecord)
-	toGatewayRecord := &flowpb.Flow{
-		K8S: &flowpb.Kubernetes{
-			DestinationServicePortName: "service-namespace/service-name:service-port-name",
-			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
-		},
-		Ip: &flowpb.IP{
-			Source:      []byte{0xac, 0x12, 0x00, 0x01}, // 172.18.0.1
-			Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
-		},
-		Transport: &flowpb.Transport{
-			ProtocolNumber:  6,
-			SourcePort:      50634,
-			DestinationPort: 80,
-		},
-		Stats:        &flowpb.Stats{},
-		ReverseStats: &flowpb.Stats{},
-		StartTs:      timestamppb.New(time.Time{}),
-		EndTs:        timestamppb.New(time.Time{}),
-	}
-	flowKeyToGateway, _ := getFlowKeyFromRecord(toGatewayRecord)
-	ap.addOrUpdateRecordInMap(flowKeyToGateway, toGatewayRecord, false)
-	assert.NotNil(t, toGatewayRecord.Aggregation)
-	assert.Equal(t, 1, len(ap.expirePriorityQueue))
-	assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
+	t.Run("toGateway arrives first", func(t *testing.T) {
+		recordChan := make(chan *flowpb.Flow)
+		input := AggregationInput{
+			RecordChan:            recordChan,
+			WorkerNum:             2,
+			ActiveExpiryTimeout:   testActiveExpiry,
+			InactiveExpiryTimeout: testInactiveExpiry,
+		}
+		clock := clocktesting.NewFakeClock(time.Now())
+		ap, _ := initAggregationProcessWithClock(input, clock)
 
-	ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
-	assert.Equal(t, destinationPodName, toGatewayRecord.K8S.DestinationPodName)
-	assert.Equal(t, 1, len(ap.expirePriorityQueue))
-}
+		fromGatewayRecord, flowKeyFromGateway := generateFromGatewayFlowAndFlowKey()
+		toGatewayRecord, flowKeyToGateway := generateToGatewayFlowAndFlowKey()
 
-// / TODO merge test with above
-func TestCorrelateRecordsForFromExternalFlow2(t *testing.T) {
-	recordChan := make(chan *flowpb.Flow)
-	input := AggregationInput{
-		RecordChan:            recordChan,
-		WorkerNum:             2,
-		ActiveExpiryTimeout:   testActiveExpiry,
-		InactiveExpiryTimeout: testInactiveExpiry,
-	}
-	clock := clocktesting.NewFakeClock(time.Now())
-	ap, _ := initAggregationProcessWithClock(input, clock)
-	// Test IPv4 fields.
-	// Test the scenario, where record1 is added first and then record2.
-	destinationPodName := "nginx-deployment-HASH"
-	fromGatewayRecord := &flowpb.Flow{
-		K8S: &flowpb.Kubernetes{
-			DestinationPodName: destinationPodName,
-			FlowType:           flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
-		},
-		Ip: &flowpb.IP{
-			Source:      []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
-			Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
-		},
-		Transport: &flowpb.Transport{
-			ProtocolNumber:  6,
-			SourcePort:      13914,
-			DestinationPort: 80,
-		},
-		Stats:        &flowpb.Stats{},
-		ReverseStats: &flowpb.Stats{},
-		StartTs:      timestamppb.New(time.Time{}),
-		EndTs:        timestamppb.New(time.Time{}),
-	}
-	flowKeyFromGateway, _ := getFlowKeyFromRecord(fromGatewayRecord)
-	toGatewayRecord := &flowpb.Flow{
-		K8S: &flowpb.Kubernetes{
-			DestinationServicePortName: "service-namespace/service-name:service-port-name",
-			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
-		},
-		Ip: &flowpb.IP{
-			Source:      []byte{0xac, 0x12, 0x00, 0x01}, // 172.18.0.1
-			Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
-		},
-		Transport: &flowpb.Transport{
-			ProtocolNumber:  6,
-			SourcePort:      50634,
-			DestinationPort: 80,
-		},
-		Stats:        &flowpb.Stats{},
-		ReverseStats: &flowpb.Stats{},
-		StartTs:      timestamppb.New(time.Time{}),
-		EndTs:        timestamppb.New(time.Time{}),
-	}
-	flowKeyToGateway, _ := getFlowKeyFromRecord(toGatewayRecord)
+		ap.addOrUpdateRecordInMap(flowKeyToGateway, toGatewayRecord, false)
+		assert.NotNil(t, toGatewayRecord.Aggregation)
+		assert.Equal(t, 1, len(ap.expirePriorityQueue))
+		assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
 
-	ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
-	assert.Nil(t, fromGatewayRecord.Aggregation)
+		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
+		assert.Equal(t, destinationPodName, toGatewayRecord.K8S.DestinationPodName)
+		assert.Equal(t, 1, len(ap.expirePriorityQueue))
+	})
 
-	assert.Equal(t, 0, len(ap.expirePriorityQueue))
-	assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
+	t.Run("fromGateway arrives first", func(t *testing.T) {
+		recordChan := make(chan *flowpb.Flow)
+		input := AggregationInput{
+			RecordChan:            recordChan,
+			WorkerNum:             2,
+			ActiveExpiryTimeout:   testActiveExpiry,
+			InactiveExpiryTimeout: testInactiveExpiry,
+		}
+		clock := clocktesting.NewFakeClock(time.Now())
+		ap, _ := initAggregationProcessWithClock(input, clock)
 
-	ap.addOrUpdateRecordInMap(flowKeyToGateway, toGatewayRecord, false)
-	assert.Equal(t, destinationPodName, toGatewayRecord.K8S.DestinationPodName)
-	assert.Equal(t, 1, len(ap.expirePriorityQueue))
+		fromGatewayRecord, flowKeyFromGateway := generateFromGatewayFlowAndFlowKey()
+		toGatewayRecord, flowKeyToGateway := generateToGatewayFlowAndFlowKey()
+
+		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
+		assert.Nil(t, fromGatewayRecord.Aggregation)
+
+		assert.Equal(t, 0, len(ap.expirePriorityQueue))
+		assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
+
+		ap.addOrUpdateRecordInMap(flowKeyToGateway, toGatewayRecord, false)
+		assert.Equal(t, destinationPodName, toGatewayRecord.K8S.DestinationPodName)
+		assert.Equal(t, 1, len(ap.expirePriorityQueue))
+	})
+
+	t.Run("toGateway arrives multiple times", func(t *testing.T) {
+		recordChan := make(chan *flowpb.Flow)
+		input := AggregationInput{
+			RecordChan:            recordChan,
+			WorkerNum:             2,
+			ActiveExpiryTimeout:   testActiveExpiry,
+			InactiveExpiryTimeout: testInactiveExpiry,
+		}
+		clock := clocktesting.NewFakeClock(time.Now())
+		ap, _ := initAggregationProcessWithClock(input, clock)
+
+		toGatewayRecord, flowKeyToGateway := generateToGatewayFlowAndFlowKey()
+
+		ap.addOrUpdateRecordInMap(flowKeyToGateway, toGatewayRecord, false)
+		ap.addOrUpdateRecordInMap(flowKeyToGateway, toGatewayRecord, false)
+	})
+	t.Run("fromGateway arrives multiple times", func(t *testing.T) {
+		recordChan := make(chan *flowpb.Flow)
+		input := AggregationInput{
+			RecordChan:            recordChan,
+			WorkerNum:             2,
+			ActiveExpiryTimeout:   testActiveExpiry,
+			InactiveExpiryTimeout: testInactiveExpiry,
+		}
+		clock := clocktesting.NewFakeClock(time.Now())
+		ap, _ := initAggregationProcessWithClock(input, clock)
+
+		fromGatewayRecord, flowKeyFromGateway := generateFromGatewayFlowAndFlowKey()
+
+		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
+		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
+	})
 }
 
 func TestAggregateRecordsForInterNodeFlow(t *testing.T) {

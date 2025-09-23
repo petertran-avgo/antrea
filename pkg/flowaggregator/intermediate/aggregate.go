@@ -361,14 +361,18 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 	klog.InfoS("received FromExternal record", "record", record)
 	if exists {
 		if isToGateway(record) {
-			record.K8S.DestinationPodName = stash.FromGateway.Record.K8S.DestinationPodName
-			pqItem := &ItemToExpire{
-				flowKey: flowKey,
+			if stash.FromGateway != nil {
+				record.K8S.DestinationPodName = stash.FromGateway.Record.K8S.DestinationPodName
+				pqItem := &ItemToExpire{
+					flowKey: flowKey,
+				}
+				heap.Push(&a.expirePriorityQueue, pqItem)
 			}
-			heap.Push(&a.expirePriorityQueue, pqItem)
 		} else {
-			aggregationRecord := stash.ToGateway
-			aggregationRecord.Record.K8S.DestinationPodName = record.K8S.DestinationPodName
+			if stash.ToGateway != nil {
+				aggregationRecord := stash.ToGateway
+				aggregationRecord.Record.K8S.DestinationPodName = record.K8S.DestinationPodName
+			}
 		}
 	} else {
 		if isToGateway(record) {
