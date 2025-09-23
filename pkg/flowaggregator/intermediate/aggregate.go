@@ -368,6 +368,13 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				pqItem := &ItemToExpire{
 					flowKey: flowKey,
 				}
+				aggregationRecord := &AggregationFlowRecord{
+					Record:                    record,
+					ReadyToSend:               false,
+					waitForReadyToSendRetries: 0,
+					isIPv4:                    false,
+				}
+				pqItem.flowRecord = aggregationRecord
 				heap.Push(&a.expirePriorityQueue, pqItem)
 			}
 		} else {
@@ -378,7 +385,10 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 		}
 	} else {
 		if isToGateway(record) {
-			record.Aggregation = &flowpb.Aggregation{}
+			pqItem := &ItemToExpire{
+				flowKey: flowKey,
+			}
+			record.Aggregation = &flowpb.Aggregation{} // todo do we need this?
 			aggregationRecord := &AggregationFlowRecord{
 				Record:                    record,
 				ReadyToSend:               false,
@@ -386,12 +396,9 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				isIPv4:                    false,
 			}
 
-			pqItem := &ItemToExpire{
-				flowKey: flowKey,
-			}
 			//aggregationRecord.PriorityQueueItem = pqItem
 
-			//pqItem.flowRecord = aggregationRecord
+			pqItem.flowRecord = aggregationRecord
 			//pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
 			//pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
 			heap.Push(&a.expirePriorityQueue, pqItem)

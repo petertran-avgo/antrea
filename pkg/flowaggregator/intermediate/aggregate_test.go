@@ -459,6 +459,7 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.NotNil(t, toGatewayRecord.Aggregation)
 		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 		assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
+		assert.NotNil(t, ap.expirePriorityQueue.Peek().flowRecord)
 
 		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
 		assert.Equal(t, destinationPodName, toGatewayRecord.K8S.DestinationPodName)
@@ -488,6 +489,7 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		ap.addOrUpdateRecordInMap(flowKeyToGateway, toGatewayRecord, false)
 		assert.Equal(t, destinationPodName, toGatewayRecord.K8S.DestinationPodName)
 		assert.Equal(t, 1, len(ap.expirePriorityQueue))
+		assert.NotNil(t, ap.expirePriorityQueue.Peek().flowRecord)
 	})
 
 	t.Run("toGateway arrives multiple times", func(t *testing.T) {
