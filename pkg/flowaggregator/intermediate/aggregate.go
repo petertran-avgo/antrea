@@ -285,10 +285,12 @@ func (a *aggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMa
 		return nil
 	}
 	currTime := a.clock.Now()
+	klog.InfoS("size of queue", "len", a.expirePriorityQueue.Len())
 	for a.expirePriorityQueue.Len() > 0 {
 		topItem := a.expirePriorityQueue.Peek()
 		if topItem.activeExpireTime.After(currTime) && topItem.inactiveExpireTime.After(currTime) {
 			// We do not have to check other items anymore.
+
 			break
 		}
 		// Pop the record item from the priority queue
