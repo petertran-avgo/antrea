@@ -291,12 +291,13 @@ func (a *aggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMa
 		if topItem.activeExpireTime.After(currTime) && topItem.inactiveExpireTime.After(currTime) {
 			// We do not have to check other items anymore.
 
+			klog.Info("breaking cause top item in queue  not expired")
 			break
-			klog.Info("peeked at queue but breaking instead")
 		}
 		// Pop the record item from the priority queue
 		pqItem := heap.Pop(&a.expirePriorityQueue).(*ItemToExpire)
 		if !pqItem.flowRecord.ReadyToSend {
+			klog.Info("popped item from queue but its not ready ot send")
 			// Reset the timeouts and add the record to priority queue.
 			// Delete the record after max retries.
 			pqItem.flowRecord.waitForReadyToSendRetries = pqItem.flowRecord.waitForReadyToSendRetries + 1
@@ -309,9 +310,11 @@ func (a *aggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMa
 				pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
 				pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
 				heap.Push(&a.expirePriorityQueue, pqItem)
+				klog.Info("popped item did not reach max retries so its being readded")
 			}
 			continue
 		}
+		klog.Info("popped is ready to be sent")
 		err := callback(*pqItem.flowKey, pqItem.flowRecord)
 		if err != nil {
 			return fmt.Errorf("callback execution failed for popped flow record with key: %v, record: %v, error: %v", pqItem.flowKey, pqItem.flowRecord, err)
