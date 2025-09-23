@@ -292,6 +292,7 @@ func (a *aggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMa
 			// We do not have to check other items anymore.
 
 			break
+			klog.Info("peeked at queue but breaking instead")
 		}
 		// Pop the record item from the priority queue
 		pqItem := heap.Pop(&a.expirePriorityQueue).(*ItemToExpire)
