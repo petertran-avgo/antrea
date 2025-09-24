@@ -357,6 +357,7 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteContr
 	}
 
 	if srcIsGw {
+		klog.InfoS("flow source is gateway, marking as from External", "conn", conn)
 		return utils.FlowTypeFromExternal
 	}
 
@@ -364,6 +365,10 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteContr
 		if serviceLookUp == nil || serviceLookUp.IsNil() {
 			klog.V(5).InfoS("Can't find flow type without serviceLookUp")
 			return utils.FlowTypeUnspecified
+		}
+		if dstIsPod {
+			klog.InfoS("destination is pod so marking FromExternal", "conn", conn)
+			return utils.FlowTypeFromExternal
 		}
 		if err := serviceLookUp.FillServiceInfo(&conn); err == nil || dstIsPod {
 			return utils.FlowTypeFromExternal
