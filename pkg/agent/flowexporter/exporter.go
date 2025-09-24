@@ -356,15 +356,16 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteContr
 		return utils.FlowTypeUnsupported
 	}
 
-	if !srcIsPod && srcIsGw {
-		if serviceLookUp == nil || serviceLookUp.IsNil() {
-			klog.V(5).InfoS("Can't find flow type without serviceLookUp")
-			return utils.FlowTypeUnspecified
+	if !srcIsPod {
+		if srcIsGw || dstIsPod {
+			if serviceLookUp == nil || serviceLookUp.IsNil() {
+				klog.V(5).InfoS("Can't find flow type without serviceLookUp")
+				return utils.FlowTypeUnspecified
+			}
+			if err := serviceLookUp.FillServiceInfo(&conn); err == nil {
+				return utils.FlowTypeFromExternal
+			}
 		}
-		if err := serviceLookUp.FillServiceInfo(&conn); err == nil {
-			return utils.FlowTypeFromExternal
-		}
-		klog.InfoS("flow is unsupported because src is not a pod and no service matches found", "conn", conn)
 		return utils.FlowTypeUnsupported
 	}
 
