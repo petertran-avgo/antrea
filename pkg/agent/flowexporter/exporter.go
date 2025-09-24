@@ -355,8 +355,13 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteContr
 		klog.V(5).InfoS("Flows where the source or destination IP is a gateway IP will not be exported")
 		return utils.FlowTypeUnsupported
 	}
+	klog.InfoS("qq finding flow for", "conn", conn)
 
 	if !srcIsPod {
+		klog.InfoS("qq flow src is not a pod", "conn", conn)
+		if dstIsPod {
+			klog.InfoS("qq dst is pod", "conn", conn)
+		}
 		if srcIsGw || dstIsPod {
 			if serviceLookUp == nil || serviceLookUp.IsNil() {
 				klog.V(5).InfoS("Can't find flow type without serviceLookUp")
@@ -365,6 +370,7 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteContr
 			if err := serviceLookUp.FillServiceInfo(&conn); err == nil {
 				return utils.FlowTypeFromExternal
 			}
+			klog.InfoS("qq could not fill service info for", "conn", conn)
 		}
 		return utils.FlowTypeUnsupported
 	}
