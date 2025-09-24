@@ -401,8 +401,8 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			}
 		}
 	} else {
-		klog.InfoS("record does not exist in externalipport map", "record", record)
 		if isToGateway(record) {
+			klog.InfoS("record does not exist in externalipport map so adding it to the queue", "record", record)
 			pqItem := &ItemToExpire{
 				flowKey: flowKey,
 			}
@@ -416,9 +416,10 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 
 			//aggregationRecord.PriorityQueueItem = pqItem
 
+			currTime := a.clock.Now()
 			pqItem.flowRecord = aggregationRecord
-			//pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
-			//pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
+			pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)     // not covered by test
+			pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout) // not covered by test
 			heap.Push(&a.expirePriorityQueue, pqItem)
 			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{ToGateway: aggregationRecord}
 		} else {
