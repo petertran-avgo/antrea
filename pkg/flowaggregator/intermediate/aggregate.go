@@ -381,6 +381,8 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 					isIPv4:                    false,
 				}
 				pqItem.flowRecord = aggregationRecord
+				a.addFieldsForStatsAggregation(record, false, true)
+				a.addFieldsForThroughputCalculation(record, false, true)
 				heap.Push(&a.expirePriorityQueue, pqItem)
 			}
 		} else {
