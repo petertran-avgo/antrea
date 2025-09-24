@@ -364,12 +364,15 @@ func isToGateway(record *flowpb.Flow) bool {
 }
 
 func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, record *flowpb.Flow) {
+
+	//TODO the two flows are perhaps better named as "fromSource" instead of toGateway
 	key := string(record.Ip.Destination) + strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
 	stash, exists := a.FromExternalIPPortMap[key]
 	klog.InfoS("received FromExternal record", "record", record, "key", key)
 	if exists {
 		klog.InfoS("record exists in externalipport map", "record", record)
 		if isToGateway(record) {
+			klog.InfoS("record is to Gateway", "record", record)
 			if stash.FromGateway != nil {
 				record.K8S.DestinationPodName = stash.FromGateway.Record.K8S.DestinationPodName
 				pqItem := &ItemToExpire{
@@ -393,14 +396,18 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				klog.InfoS("record exists but FromGateway missing", "record", record)
 			}
 		} else {
+			klog.InfoS("record is from gateway", "record", record)
 			if stash.ToGateway != nil {
 				aggregationRecord := stash.ToGateway
 				aggregationRecord.Record.K8S.DestinationPodName = record.K8S.DestinationPodName
 				aggregationRecord.ReadyToSend = true
 				klog.InfoS("record exists, received fromGateway record, filled it but didnt add it to queue", "record", record)
+			} else {
+				klog.InfoS("stash does not have toGateway info so nothing is done", "record", record)
 			}
 		}
 	} else {
+		klog.InfoS("record does not exist in externalipport map ", "record", record)
 		if isToGateway(record) {
 			klog.InfoS("record does not exist in externalipport map so adding it to the queue", "record", record)
 			pqItem := &ItemToExpire{
@@ -423,6 +430,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			heap.Push(&a.expirePriorityQueue, pqItem)
 			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{ToGateway: aggregationRecord}
 		} else {
+			klog.InfoS("record s not to gateway so it's not added to the queue", "record", record)
 			aggregationRecord := &AggregationFlowRecord{
 				Record:                    record,
 				ReadyToSend:               false,
