@@ -332,6 +332,7 @@ func (exp *FlowExporter) IsNil() bool {
 }
 
 func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteController nodeRouteControllerInterface, serviceLookUp serviceLookUpInterface) uint8 {
+	klog.InfoS("qq finding flow for", "conn", conn)
 	// TODO: support Pod-To-External flows in network policy only mode.
 	if exp.isNetworkPolicyOnly {
 		if conn.SourcePodName == "" || conn.DestinationPodName == "" {
@@ -355,7 +356,6 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteContr
 		klog.V(5).InfoS("Flows where the source or destination IP is a gateway IP will not be exported")
 		return utils.FlowTypeUnsupported
 	}
-	klog.InfoS("qq finding flow for", "conn", conn)
 
 	if !srcIsPod {
 		klog.InfoS("qq flow src is not a pod", "conn", conn)
