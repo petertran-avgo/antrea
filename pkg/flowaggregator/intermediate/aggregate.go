@@ -366,8 +366,9 @@ func isToGateway(record *flowpb.Flow) bool {
 func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, record *flowpb.Flow) {
 	key := string(record.Ip.Destination) + strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
 	stash, exists := a.FromExternalIPPortMap[key]
-	klog.InfoS("received FromExternal record", "record", record)
+	klog.InfoS("received FromExternal record", "record", record, "key", key)
 	if exists {
+		klog.InfoS("record exists in externalipport map", "record", record)
 		if isToGateway(record) {
 			if stash.FromGateway != nil {
 				record.K8S.DestinationPodName = stash.FromGateway.Record.K8S.DestinationPodName
@@ -380,22 +381,27 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 					waitForReadyToSendRetries: 0,
 					isIPv4:                    false,
 				}
-				record.Aggregation = &flowpb.Aggregation{} // not covered by test
-				pqItem.flowRecord = aggregationRecord
+				record.Aggregation = &flowpb.Aggregation{}         // not covered by test
+				pqItem.flowRecord = aggregationRecord              // not covered by test
 				a.addFieldsForStatsAggregation(record, true, true) // not covered by test
 
 				a.addFieldsForThroughputCalculation(record, true, true) // not covered by test
 
+				klog.InfoS("record updated, pushing to the queue for logging", "record", record)
 				heap.Push(&a.expirePriorityQueue, pqItem)
+			} else {
+				klog.InfoS("record exists but FromGateway missing", "record", record)
 			}
 		} else {
 			if stash.ToGateway != nil {
 				aggregationRecord := stash.ToGateway
 				aggregationRecord.Record.K8S.DestinationPodName = record.K8S.DestinationPodName
 				aggregationRecord.ReadyToSend = true
+				klog.InfoS("record exists, received fromGateway record, filled it but didnt add it to queue", "record", record)
 			}
 		}
 	} else {
+		klog.InfoS("record does not exist in externalipport map", "record", record)
 		if isToGateway(record) {
 			pqItem := &ItemToExpire{
 				flowKey: flowKey,
