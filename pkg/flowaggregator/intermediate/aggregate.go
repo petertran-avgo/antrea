@@ -328,9 +328,11 @@ func (a *aggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMa
 		}
 		// Reset the expireTime for the popped item and push it to the priority queue.
 		if pqItem.activeExpireTime.Before(currTime) {
+			klog.Info("popped item being readded to queue 332", "record", pqItem.flowRecord)
 			// Reset the active expire timeout and push the record into priority
 			// queue.
 			pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
+
 			heap.Push(&a.expirePriorityQueue, pqItem)
 		}
 	}
