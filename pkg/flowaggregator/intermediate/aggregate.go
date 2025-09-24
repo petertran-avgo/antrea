@@ -382,9 +382,9 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				}
 				record.Aggregation = &flowpb.Aggregation{} // not covered by test
 				pqItem.flowRecord = aggregationRecord
-				a.addFieldsForStatsAggregation(record, false, true) // not covered by test
+				a.addFieldsForStatsAggregation(record, true, true) // not covered by test
 
-				a.addFieldsForThroughputCalculation(record, false, true) // not covered by test
+				a.addFieldsForThroughputCalculation(record, true, true) // not covered by test
 
 				heap.Push(&a.expirePriorityQueue, pqItem)
 			}
