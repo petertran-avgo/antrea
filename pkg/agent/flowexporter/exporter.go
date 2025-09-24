@@ -427,6 +427,7 @@ func (exp *FlowExporter) FillServiceInfo(conn *connection.Connection) error {
 	if matchingServiceName == "" {
 		errorMessage := errors.New("No service with matching port found")
 		klog.ErrorS(errorMessage, "Failed to find service info for connection", "connection", conn)
+		return errorMessage
 	}
 	conn.DestinationServicePortName = fmt.Sprintf("%s/%s:%s", conn.DestinationPodNamespace, matchingServiceName, portName)
 	return nil
