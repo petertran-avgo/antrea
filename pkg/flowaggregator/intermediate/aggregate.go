@@ -363,7 +363,37 @@ func isToGateway(record *flowpb.Flow) bool {
 	return record.K8S.DestinationPodName == ""
 }
 
+// correlationRequired takes in records of flow type FromExternal and returns true if
+// colocation is not required because it is the case where the external call hits the node
+// that happens to have the pod serving the request. When this case happens,
+// both the destination pod name was
+// correlation is not required when
+// the destination pod name is non empty (because the exporter is able to fill this in due to being colocated with the target pod)
+// and the service port is discoverable (which isn't done when the record doesn't have the original source and destination port)
+func correlationRequired(record *flowpb.Flow) bool {
+	return record.K8S.DestinationPodName == "" || record.K8S.DestinationServicePortName == ""
+}
+
 func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, record *flowpb.Flow) {
+
+	if !correlationRequired(record) {
+		pqItem := &ItemToExpire{
+			flowKey: flowKey,
+		}
+		aggregationRecord := &AggregationFlowRecord{
+			Record:                    record,
+			ReadyToSend:               true,
+			waitForReadyToSendRetries: 0,
+			isIPv4:                    false,
+		}
+		record.Aggregation = &flowpb.Aggregation{}              // not covered by test
+		pqItem.flowRecord = aggregationRecord                   // not covered by test
+		a.addFieldsForStatsAggregation(record, true, true)      // not covered by test
+		a.addFieldsForThroughputCalculation(record, true, true) // not covered by test
+
+		heap.Push(&a.expirePriorityQueue, pqItem)
+		return
+	}
 
 	ipAddressAsString := func(bytes []byte) string {
 		if len(bytes) == 0 {
@@ -377,6 +407,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 	klog.InfoS("received FromExternal record", "record", record, "key", key)
 	if exists {
 		klog.InfoS("record exists in externalipport map", "record", record)
+		//TODO: perhaps we can distinguish these two records based on zone info instead of gateway
 		if isToGateway(record) {
 			klog.InfoS("record is to Gateway", "record", record)
 			if stash.FromGateway != nil {

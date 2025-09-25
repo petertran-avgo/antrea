@@ -436,11 +436,71 @@ func generateFromGatewayFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 	return fromGatewayRecord, flowKeyFromGateway
 }
 
+// TestCorrelationRequired validates the logic behind wether or not a FromExternal flow
+// can be exported right away or needs correlation
+func TestCorrelationRequired(t *testing.T) {
+	t.Run("correlation is not required", func(t *testing.T) {
+		record := &flowpb.Flow{
+			K8S: &flowpb.Kubernetes{
+				DestinationPodName:         "nginx-deployment-79c8dcc9c4-nq8jp",
+				DestinationServicePortName: "namespace/service-name:portname",
+			},
+		}
+		assert.False(t, correlationRequired(record))
+	})
+	t.Run("correlation is required", func(t *testing.T) {
+		record := &flowpb.Flow{
+			K8S: &flowpb.Kubernetes{
+				DestinationPodName:         "nginx-deployment-79c8dcc9c4-nq8jp",
+				DestinationServicePortName: "",
+			},
+		}
+		assert.True(t, correlationRequired(record))
+	})
+}
+
 // TestCorrelateRecordsForFromExternalFlow validates flows received by the FlowAggregator
 // are correctly correlated as they come from 2 zones with different information
 func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
-	// Test IPv4 fields.
-	// Test the scenario, where record1 is added first and then record2.
+	t.Run("correlation not required because the external to pod connection happen to hit the node that had the pod", func(t *testing.T) {
+		recordChan := make(chan *flowpb.Flow)
+		input := AggregationInput{
+			RecordChan:            recordChan,
+			WorkerNum:             2,
+			ActiveExpiryTimeout:   testActiveExpiry,
+			InactiveExpiryTimeout: testInactiveExpiry,
+		}
+		clock := clocktesting.NewFakeClock(time.Now())
+		ap, _ := initAggregationProcessWithClock(input, clock)
+		record := &flowpb.Flow{
+			K8S: &flowpb.Kubernetes{
+				DestinationPodName:         "nginx-deployment-79c8dcc9c4-nq8jp",
+				FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
+				DestinationServicePortName: "namespace/service-name:portname",
+			},
+			Ip: &flowpb.IP{
+				Source:      []byte{0xac, 0x12, 0x00, 0x01}, // 172.12.18.01
+				Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
+			},
+			Transport: &flowpb.Transport{
+				ProtocolNumber:  6,
+				SourcePort:      13914,
+				DestinationPort: 80,
+			},
+			Stats:        &flowpb.Stats{},
+			ReverseStats: &flowpb.Stats{},
+			StartTs:      timestamppb.New(time.Time{}),
+			EndTs:        timestamppb.New(time.Time{}),
+		}
+		flowKey, _ := getFlowKeyFromRecord(record)
+
+		ap.addOrUpdateRecordInMap(flowKey, record, false)
+		assert.NotNil(t, record.Aggregation)
+		assert.Equal(t, 1, len(ap.expirePriorityQueue))
+		assert.NotNil(t, ap.expirePriorityQueue.Peek().flowRecord)
+		assert.True(t, ap.expirePriorityQueue.Peek().flowRecord.ReadyToSend)
+
+	})
 	t.Run("toGateway arrives first", func(t *testing.T) {
 		recordChan := make(chan *flowpb.Flow)
 		input := AggregationInput{
