@@ -438,7 +438,9 @@ func (m mockServiceLookUpErrors) FillServiceInfo(conn *connection.Connection) er
 func TestFlowExporter_findFlowType(t *testing.T) {
 	conn1 := connection.Connection{SourcePodName: "podA", DestinationPodName: "podB"}
 	conn2 := connection.Connection{SourcePodName: "podA", DestinationPodName: ""}
-	conn3 := connection.Connection{FlowKey: connection.Tuple{SourceAddress: isGateway}}
+	conn3 := connection.Connection{FlowKey: connection.Tuple{SourceAddress: isGateway, DestinationAddress: isPod}}
+	conn5 := connection.Connection{FlowKey: connection.Tuple{SourceAddress: isGateway, DestinationAddress: isPod},
+		DestinationPodNamespace: "flow-aggregator"}
 	conn4 := connection.Connection{FlowKey: connection.Tuple{DestinationAddress: isGateway}}
 	conn6 := connection.Connection{FlowKey: connection.Tuple{DestinationAddress: isNotPod, SourceAddress: isPod}}
 	conn7 := connection.Connection{FlowKey: connection.Tuple{DestinationAddress: isPod, SourceAddress: isPod}}
@@ -462,7 +464,8 @@ func TestFlowExporter_findFlowType(t *testing.T) {
 		{"isNetworkPolicy and pod names exist", true, conn1, utils.FlowTypeIntraNode, nil, nil},
 		{"isNetworkPolicy and pod names are missing", true, conn2, utils.FlowTypeInterNode, nil, nil},
 		{"unspecified flow type", false, conn1, utils.FlowTypeUnspecified, nil, nil},
-		{"source is gateway", false, conn3, utils.FlowTypeFromExternal, mockController, nil},
+		{"source is gateway and destinoation is not flow aggregator", false, conn3, utils.FlowTypeFromExternal, mockController, nil},
+		{"source is gateway and destinoation is flow aggregator", false, conn5, utils.FlowTypeUnsupported, mockController, nil},
 		{"destination is gateway", false, conn4, utils.FlowTypeUnsupported, mockController, nil},
 		{"source is pod, but destination is not", false, conn6, utils.FlowTypeToExternal, mockController, nil},
 		{"pod names missing", false, conn7, utils.FlowTypeInterNode, mockController, nil},
