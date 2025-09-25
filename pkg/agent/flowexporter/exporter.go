@@ -344,6 +344,7 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteContr
 
 	// The interface can have non nil pointer but nil value so checking both is required
 	if nodeRouteController == nil || nodeRouteController.IsNil() {
+		klog.InfoS("node controller router nil", "conn", conn)
 		klog.V(5).InfoS("Can't find flow type without nodeRouteController")
 		return utils.FlowTypeUnspecified
 	}
@@ -364,6 +365,7 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteContr
 			return utils.FlowTypeUnspecified
 		}
 		if err := serviceLookUp.FillServiceInfo(&conn); err == nil {
+			klog.InfoS("fill service info successful", "conn", conn)
 			return utils.FlowTypeFromExternal
 		}
 		klog.InfoS("qq could not fill service info for", "conn", conn)
