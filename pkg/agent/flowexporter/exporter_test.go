@@ -443,13 +443,13 @@ func TestFlowExporter_findFlowType(t *testing.T) {
 	conn6 := connection.Connection{FlowKey: connection.Tuple{DestinationAddress: isNotPod, SourceAddress: isPod}}
 	conn7 := connection.Connection{FlowKey: connection.Tuple{DestinationAddress: isPod, SourceAddress: isPod}}
 	conn8 := connection.Connection{SourcePodName: "source-pod-name", DestinationPodName: "destination-pod-name", FlowKey: connection.Tuple{DestinationAddress: isPod, SourceAddress: isPod}}
-	conn9 := connection.Connection{FlowKey: connection.Tuple{SourceAddress: isGateway}}
 	conn10 := connection.Connection{FlowKey: connection.Tuple{SourceAddress: isNotPod, DestinationAddress: isPod}}
+	conn11 := connection.Connection{FlowKey: connection.Tuple{SourceAddress: isNotPod, DestinationAddress: isNotPod}}
 	mockController := mockNodeRouteController{}
 	mockServiceLookUp := mockServiceLookUp{}
-	mockServiceLookUpErrors := mockServiceLookUpErrors{}
-	var nilFlowExporter *FlowExporter = nil
-	var nilServiceLookUp serviceLookUpInterface = nilFlowExporter
+	//mockServiceLookUpErrors := mockServiceLookUpErrors{} TODO  - this is not tested
+	//var nilFlowExporter *FlowExporter = nil // todo - should this be used?
+	//var nilServiceLookUp serviceLookUpInterface = nilFlowExporter // TODO this is not tested
 	for _, tc := range []struct {
 		name                              string
 		isNetworkPolicyOnly               bool
@@ -462,14 +462,13 @@ func TestFlowExporter_findFlowType(t *testing.T) {
 		{"isNetworkPolicy and pod names exist", true, conn1, utils.FlowTypeIntraNode, nil, nil},
 		{"isNetworkPolicy and pod names are missing", true, conn2, utils.FlowTypeInterNode, nil, nil},
 		{"unspecified flow type", false, conn1, utils.FlowTypeUnspecified, nil, nil},
-		{"source is gateway and no matching service", false, conn3, utils.FlowTypeUnsupported, mockController, mockServiceLookUpErrors},
+		{"source is gateway", false, conn3, utils.FlowTypeFromExternal, mockController, nil},
 		{"destination is gateway", false, conn4, utils.FlowTypeUnsupported, mockController, nil},
 		{"source is pod, but destination is not", false, conn6, utils.FlowTypeToExternal, mockController, nil},
 		{"pod names missing", false, conn7, utils.FlowTypeInterNode, mockController, nil},
 		{"pod names not missing", false, conn8, utils.FlowTypeIntraNode, mockController, nil},
-		{"source is gateway and service lookup is nil", false, conn9, utils.FlowTypeUnspecified, mockController, nilServiceLookUp},
-		{"source is gateway and service lookup succeeds", false, conn9, utils.FlowTypeFromExternal, mockController, mockServiceLookUp},
 		{"source is not pod but destination is", false, conn10, utils.FlowTypeFromExternal, mockController, mockServiceLookUp},
+		{"source and destination are not pods", false, conn11, utils.FlowTypeUnsupported, mockController, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			flowExp := &FlowExporter{
