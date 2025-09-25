@@ -335,6 +335,7 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteContr
 	klog.InfoS("qq finding flow for", "conn", conn)
 	// TODO: support Pod-To-External flows in network policy only mode.
 	if exp.isNetworkPolicyOnly {
+		klog.InfoS("network policy is on", "conn", conn)
 		if conn.SourcePodName == "" || conn.DestinationPodName == "" {
 			return utils.FlowTypeInterNode
 		}
