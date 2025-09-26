@@ -389,8 +389,8 @@ func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
 
 var destinationPodName = "nginx-deployment-HASH"
 
-func generateToGatewayFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
-	toGatewayRecord := &flowpb.Flow{
+func generateFromOriginalSourceFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
+	fromOriginalSourceRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
 			DestinationServicePortName: "service-namespace/service-name:service-port-name",
 			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
@@ -414,8 +414,8 @@ func generateToGatewayFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 		StartTs:      timestamppb.New(time.Now()),
 		EndTs:        timestamppb.New(time.Now().Add(1 * time.Minute)),
 	}
-	flowKeyToGateway, _ := getFlowKeyFromRecord(toGatewayRecord)
-	return toGatewayRecord, flowKeyToGateway
+	flowKeyfromOriginalSource, _ := getFlowKeyFromRecord(fromOriginalSourceRecord)
+	return fromOriginalSourceRecord, flowKeyfromOriginalSource
 }
 func generateFromGatewayFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 	fromGatewayRecord := &flowpb.Flow{
@@ -456,7 +456,7 @@ func TestCorrelationRequired(t *testing.T) {
 	t.Run("correlation is required", func(t *testing.T) {
 		record := &flowpb.Flow{
 			K8S: &flowpb.Kubernetes{
-				DestinationPodName:         "nginx-deployment-79c8dcc9c4-nq8jp",
+				DestinationPodName:         "",
 				DestinationServicePortName: "",
 			},
 		}
@@ -517,7 +517,7 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.NotEmpty(t, record.Aggregation.ThroughputFromDestination)
 
 	})
-	t.Run("toGateway arrives first", func(t *testing.T) {
+	t.Run("fromOrignalSource arrives first", func(t *testing.T) {
 		recordChan := make(chan *flowpb.Flow)
 		input := AggregationInput{
 			RecordChan:            recordChan,
@@ -529,10 +529,10 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		ap, _ := initAggregationProcessWithClock(input, clock)
 
 		fromGatewayRecord, flowKeyFromGateway := generateFromGatewayFlowAndFlowKey()
-		toGatewayRecord, flowKeyToGateway := generateToGatewayFlowAndFlowKey()
+		fromOriginalSourceRecord, flowKeyfromOriginalSource := generateFromOriginalSourceFlowAndFlowKey()
 
-		ap.addOrUpdateRecordInMap(flowKeyToGateway, toGatewayRecord, false)
-		assert.NotNil(t, toGatewayRecord.Aggregation)
+		ap.addOrUpdateRecordInMap(flowKeyfromOriginalSource, fromOriginalSourceRecord, false)
+		assert.NotNil(t, fromOriginalSourceRecord.Aggregation)
 		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 		assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
 		assert.NotNil(t, ap.expirePriorityQueue.Peek().flowRecord)
@@ -541,9 +541,14 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.False(t, ap.expirePriorityQueue.Peek().flowRecord.ReadyToSend)
 
 		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
-		assert.Equal(t, destinationPodName, toGatewayRecord.K8S.DestinationPodName)
+		assert.Equal(t, destinationPodName, fromOriginalSourceRecord.K8S.DestinationPodName)
 		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 		assert.True(t, ap.expirePriorityQueue.Peek().flowRecord.ReadyToSend)
+
+		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.StatsFromSource)
+		assert.Empty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.StatsFromDestination)
+		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.ThroughputFromSource)
+		assert.Empty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.ThroughputFromDestination)
 	})
 
 	t.Run("fromGateway arrives first", func(t *testing.T) {
@@ -558,15 +563,15 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		ap, _ := initAggregationProcessWithClock(input, clock)
 
 		fromGatewayRecord, flowKeyFromGateway := generateFromGatewayFlowAndFlowKey()
-		toGatewayRecord, flowKeyToGateway := generateToGatewayFlowAndFlowKey()
+		fromOriginalSourceRecord, flowKeyfromOriginalSource := generateFromOriginalSourceFlowAndFlowKey()
 
 		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
 		assert.Nil(t, fromGatewayRecord.Aggregation)
 		assert.Equal(t, 0, len(ap.expirePriorityQueue))
 		assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
 
-		ap.addOrUpdateRecordInMap(flowKeyToGateway, toGatewayRecord, false)
-		assert.Equal(t, destinationPodName, toGatewayRecord.K8S.DestinationPodName)
+		ap.addOrUpdateRecordInMap(flowKeyfromOriginalSource, fromOriginalSourceRecord, false)
+		assert.Equal(t, destinationPodName, fromOriginalSourceRecord.K8S.DestinationPodName)
 		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 		assert.NotNil(t, ap.expirePriorityQueue.Peek().flowRecord)
 		assert.True(t, ap.expirePriorityQueue.Peek().flowRecord.ReadyToSend)
@@ -576,7 +581,7 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.Empty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.ThroughputFromDestination)
 	})
 
-	t.Run("toGateway arrives multiple times", func(t *testing.T) {
+	t.Run("fromOriginalSource arrives multiple times", func(t *testing.T) {
 		recordChan := make(chan *flowpb.Flow)
 		input := AggregationInput{
 			RecordChan:            recordChan,
@@ -587,10 +592,10 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		clock := clocktesting.NewFakeClock(time.Now())
 		ap, _ := initAggregationProcessWithClock(input, clock)
 
-		toGatewayRecord, flowKeyToGateway := generateToGatewayFlowAndFlowKey()
+		fromOriginalSourceRecord, flowKeyfromOriginalSource := generateFromOriginalSourceFlowAndFlowKey()
 
-		ap.addOrUpdateRecordInMap(flowKeyToGateway, toGatewayRecord, false)
-		ap.addOrUpdateRecordInMap(flowKeyToGateway, toGatewayRecord, false)
+		ap.addOrUpdateRecordInMap(flowKeyfromOriginalSource, fromOriginalSourceRecord, false)
+		ap.addOrUpdateRecordInMap(flowKeyfromOriginalSource, fromOriginalSourceRecord, false)
 	})
 	t.Run("fromGateway arrives multiple times", func(t *testing.T) {
 		recordChan := make(chan *flowpb.Flow)

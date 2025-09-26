@@ -75,7 +75,10 @@ type AggregationInput struct {
 
 // Holds the two records that make up the FromExternal records
 type FromExternalFlowStash struct {
-	ToGateway   *AggregationFlowRecord
+	// The record from conntrack zone 0 containing the original source IP
+	FromOriginalSource *AggregationFlowRecord
+	// The record from the antrea conntrack zone containing the destination
+	// pod information
 	FromGateway *AggregationFlowRecord
 }
 
@@ -359,7 +362,10 @@ func (a *aggregationProcess) IsAggregatedRecordIPv4(record AggregationFlowRecord
 	return record.isIPv4
 }
 
-func isToGateway(record *flowpb.Flow) bool {
+// fromOriginalSource takes records with FlowType FromExternal and returns true
+// if the record is from the original source by means of inspecting the
+// destination pod information which cannot be populated for such records
+func fromOriginalSource(record *flowpb.Flow) bool {
 	return record.K8S.DestinationPodName == ""
 }
 
@@ -401,14 +407,13 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 		}
 		return net.IP(bytes).String()
 	}
-	//TODO the two flows are perhaps better named as "fromSource" instead of toGateway
 	key := ipAddressAsString(record.Ip.Destination) + strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
 	stash, exists := a.FromExternalIPPortMap[key]
 	klog.InfoS("received FromExternal record", "record", record, "key", key)
 	if exists {
 		klog.InfoS("record exists in externalipport map", "record", record)
 		//TODO: perhaps we can distinguish these two records based on zone info instead of gateway
-		if isToGateway(record) {
+		if fromOriginalSource(record) {
 			klog.InfoS("record is to Gateway", "record", record)
 			if stash.FromGateway != nil {
 				record.K8S.DestinationPodName = stash.FromGateway.Record.K8S.DestinationPodName
@@ -424,13 +429,12 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				record.Aggregation = &flowpb.Aggregation{}
 				pqItem.flowRecord = aggregationRecord
 				a.addFieldsForStatsAggregation(record, true, false)
-
 				a.addFieldsForThroughputCalculation(record, true, false)
 				heap.Push(&a.expirePriorityQueue, pqItem)
 			}
 		} else {
-			if stash.ToGateway != nil {
-				aggregationRecord := stash.ToGateway
+			if stash.FromOriginalSource != nil {
+				aggregationRecord := stash.FromOriginalSource
 				aggregationRecord.Record.K8S.DestinationPodName = record.K8S.DestinationPodName
 				aggregationRecord.ReadyToSend = true
 				klog.InfoS("record exists, received fromGateway record, filled it but didnt add it to queue", "record", record)
@@ -438,7 +442,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 		}
 	} else {
 		klog.InfoS("record does not exist in externalipport map ", "record", record)
-		if isToGateway(record) {
+		if fromOriginalSource(record) {
 			klog.InfoS("record does not exist in externalipport map so adding it to the queue", "record", record)
 			pqItem := &ItemToExpire{
 				flowKey: flowKey,
@@ -455,9 +459,11 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			pqItem.flowRecord = aggregationRecord
 			pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
 			pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
-			//TODO stats to be filled here?
+			a.addFieldsForStatsAggregation(record, true, false)
+			a.addFieldsForThroughputCalculation(record, true, false)
+
 			heap.Push(&a.expirePriorityQueue, pqItem)
-			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{ToGateway: aggregationRecord} // TODO double check this is being deleted over time
+			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{FromOriginalSource: aggregationRecord} // TODO double check this is being deleted over time
 		} else {
 			klog.InfoS("record s not to gateway so it's not added to the queue", "record", record)
 			aggregationRecord := &AggregationFlowRecord{
