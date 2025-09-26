@@ -388,6 +388,7 @@ func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
 }
 
 var destinationPodName = "nginx-deployment-HASH"
+var packetTotalCountFromOriginalSource = uint64(1005)
 
 func generateFromOriginalSourceFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 	fromOriginalSourceRecord := &flowpb.Flow{
@@ -405,10 +406,8 @@ func generateFromOriginalSourceFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 			DestinationPort: 80,
 		},
 		Stats: &flowpb.Stats{
-			PacketTotalCount: 1005,
-			PacketDeltaCount: 503,
+			PacketTotalCount: packetTotalCountFromOriginalSource,
 			OctetTotalCount:  2050,
-			OctetDeltaCount:  1030,
 		},
 		ReverseStats: &flowpb.Stats{},
 		StartTs:      timestamppb.New(time.Now()),
@@ -493,10 +492,8 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 				DestinationPort: 80,
 			},
 			Stats: &flowpb.Stats{
-				PacketTotalCount: 1005,
-				PacketDeltaCount: 503,
+				PacketTotalCount: packetTotalCountFromOriginalSource,
 				OctetTotalCount:  2050,
-				OctetDeltaCount:  1030,
 			},
 			ReverseStats: &flowpb.Stats{},
 			StartTs:      timestamppb.New(time.Now()),
@@ -510,9 +507,9 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.NotNil(t, ap.expirePriorityQueue.Peek().flowRecord)
 		assert.True(t, ap.expirePriorityQueue.Peek().flowRecord.ReadyToSend)
 		assert.NotNil(t, record.Aggregation.StatsFromSource)
-		assert.NotEmpty(t, record.Aggregation.StatsFromSource)
+		assert.Equal(t, packetTotalCountFromOriginalSource, record.Aggregation.StatsFromSource.PacketTotalCount)
 		assert.NotNil(t, record.Aggregation.StatsFromDestination)
-		assert.NotEmpty(t, record.Aggregation.StatsFromDestination)
+		assert.Equal(t, packetTotalCountFromOriginalSource, record.Aggregation.StatsFromDestination.PacketTotalCount)
 		assert.NotEmpty(t, record.Aggregation.ThroughputFromSource)
 		assert.NotEmpty(t, record.Aggregation.ThroughputFromDestination)
 
