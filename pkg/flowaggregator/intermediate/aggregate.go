@@ -386,10 +386,10 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			waitForReadyToSendRetries: 0,
 			isIPv4:                    false,
 		}
-		record.Aggregation = &flowpb.Aggregation{}              // not covered by test
-		pqItem.flowRecord = aggregationRecord                   // not covered by test
-		a.addFieldsForStatsAggregation(record, true, true)      // not covered by test
-		a.addFieldsForThroughputCalculation(record, true, true) // not covered by test
+		record.Aggregation = &flowpb.Aggregation{}
+		pqItem.flowRecord = aggregationRecord
+		a.addFieldsForStatsAggregation(record, true, true)
+		a.addFieldsForThroughputCalculation(record, true, true)
 
 		heap.Push(&a.expirePriorityQueue, pqItem)
 		return
@@ -421,26 +421,19 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 					waitForReadyToSendRetries: 0,
 					isIPv4:                    false,
 				}
-				record.Aggregation = &flowpb.Aggregation{}         // not covered by test
-				pqItem.flowRecord = aggregationRecord              // not covered by test
-				a.addFieldsForStatsAggregation(record, true, true) // not covered by test
+				record.Aggregation = &flowpb.Aggregation{}
+				pqItem.flowRecord = aggregationRecord
+				a.addFieldsForStatsAggregation(record, true, false)
 
-				a.addFieldsForThroughputCalculation(record, true, true) // not covered by test
-
-				klog.InfoS("record updated, pushing to the queue for logging", "record", record)
+				a.addFieldsForThroughputCalculation(record, true, false)
 				heap.Push(&a.expirePriorityQueue, pqItem)
-			} else {
-				klog.InfoS("record exists but FromGateway missing", "record", record)
 			}
 		} else {
-			klog.InfoS("record is from gateway", "record", record)
 			if stash.ToGateway != nil {
 				aggregationRecord := stash.ToGateway
 				aggregationRecord.Record.K8S.DestinationPodName = record.K8S.DestinationPodName
 				aggregationRecord.ReadyToSend = true
 				klog.InfoS("record exists, received fromGateway record, filled it but didnt add it to queue", "record", record)
-			} else {
-				klog.InfoS("stash does not have toGateway info so nothing is done", "record", record)
 			}
 		}
 	} else {
@@ -450,7 +443,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			pqItem := &ItemToExpire{
 				flowKey: flowKey,
 			}
-			record.Aggregation = &flowpb.Aggregation{} // todo do we need this?
+			record.Aggregation = &flowpb.Aggregation{}
 			aggregationRecord := &AggregationFlowRecord{
 				Record:                    record,
 				ReadyToSend:               false,
@@ -458,14 +451,13 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				isIPv4:                    false,
 			}
 
-			//aggregationRecord.PriorityQueueItem = pqItem
-
 			currTime := a.clock.Now()
 			pqItem.flowRecord = aggregationRecord
-			pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)     // not covered by test
-			pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout) // not covered by test
+			pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
+			pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
+			//TODO stats to be filled here?
 			heap.Push(&a.expirePriorityQueue, pqItem)
-			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{ToGateway: aggregationRecord}
+			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{ToGateway: aggregationRecord} // TODO double check this is being deleted over time
 		} else {
 			klog.InfoS("record s not to gateway so it's not added to the queue", "record", record)
 			aggregationRecord := &AggregationFlowRecord{
@@ -807,6 +799,7 @@ func (a *aggregationProcess) addFieldsForStatsAggregation(record *flowpb.Flow, f
 		copyStats(record.Stats, record.Aggregation.StatsFromSource)
 		copyStats(record.ReverseStats, record.Aggregation.ReverseStatsFromSource)
 	}
+
 	if fillDstStats {
 		copyStats(record.Stats, record.Aggregation.StatsFromDestination)
 		copyStats(record.ReverseStats, record.Aggregation.ReverseStatsFromDestination)

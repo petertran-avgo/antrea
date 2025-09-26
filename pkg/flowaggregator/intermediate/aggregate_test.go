@@ -404,10 +404,15 @@ func generateToGatewayFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 			SourcePort:      50634,
 			DestinationPort: 80,
 		},
-		Stats:        &flowpb.Stats{},
+		Stats: &flowpb.Stats{
+			PacketTotalCount: 1005,
+			PacketDeltaCount: 503,
+			OctetTotalCount:  2050,
+			OctetDeltaCount:  1030,
+		},
 		ReverseStats: &flowpb.Stats{},
-		StartTs:      timestamppb.New(time.Time{}),
-		EndTs:        timestamppb.New(time.Time{}),
+		StartTs:      timestamppb.New(time.Now()),
+		EndTs:        timestamppb.New(time.Now().Add(1 * time.Minute)),
 	}
 	flowKeyToGateway, _ := getFlowKeyFromRecord(toGatewayRecord)
 	return toGatewayRecord, flowKeyToGateway
@@ -487,10 +492,15 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 				SourcePort:      13914,
 				DestinationPort: 80,
 			},
-			Stats:        &flowpb.Stats{},
+			Stats: &flowpb.Stats{
+				PacketTotalCount: 1005,
+				PacketDeltaCount: 503,
+				OctetTotalCount:  2050,
+				OctetDeltaCount:  1030,
+			},
 			ReverseStats: &flowpb.Stats{},
-			StartTs:      timestamppb.New(time.Time{}),
-			EndTs:        timestamppb.New(time.Time{}),
+			StartTs:      timestamppb.New(time.Now()),
+			EndTs:        timestamppb.New(time.Now().Add(1 * time.Minute)),
 		}
 		flowKey, _ := getFlowKeyFromRecord(record)
 
@@ -499,6 +509,12 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 		assert.NotNil(t, ap.expirePriorityQueue.Peek().flowRecord)
 		assert.True(t, ap.expirePriorityQueue.Peek().flowRecord.ReadyToSend)
+		assert.NotNil(t, record.Aggregation.StatsFromSource)
+		assert.NotEmpty(t, record.Aggregation.StatsFromSource)
+		assert.NotNil(t, record.Aggregation.StatsFromDestination)
+		assert.NotEmpty(t, record.Aggregation.StatsFromDestination)
+		assert.NotEmpty(t, record.Aggregation.ThroughputFromSource)
+		assert.NotEmpty(t, record.Aggregation.ThroughputFromDestination)
 
 	})
 	t.Run("toGateway arrives first", func(t *testing.T) {
@@ -520,6 +536,8 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 		assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
 		assert.NotNil(t, ap.expirePriorityQueue.Peek().flowRecord)
+		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().activeExpireTime)
+		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().inactiveExpireTime)
 		assert.False(t, ap.expirePriorityQueue.Peek().flowRecord.ReadyToSend)
 
 		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
@@ -552,6 +570,10 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 		assert.NotNil(t, ap.expirePriorityQueue.Peek().flowRecord)
 		assert.True(t, ap.expirePriorityQueue.Peek().flowRecord.ReadyToSend)
+		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.StatsFromSource)
+		assert.Empty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.StatsFromDestination)
+		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.ThroughputFromSource)
+		assert.Empty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.ThroughputFromDestination)
 	})
 
 	t.Run("toGateway arrives multiple times", func(t *testing.T) {

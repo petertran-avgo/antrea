@@ -360,7 +360,6 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteContr
 	}
 
 	if srcIsGw {
-
 		//TODO: there must be a better way
 		if conn.DestinationPodNamespace == "flow-aggregator" || conn.DestinationPodNamespace == "" {
 			return utils.FlowTypeUnsupported
@@ -368,6 +367,7 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteContr
 			return utils.FlowTypeFromExternal
 		}
 	}
+
 	if !srcIsPod {
 		if dstIsPod {
 			if serviceLookUp == nil || serviceLookUp.IsNil() {
