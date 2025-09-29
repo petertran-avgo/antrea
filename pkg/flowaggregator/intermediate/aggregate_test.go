@@ -388,6 +388,7 @@ func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
 }
 
 var destinationPodName = "nginx-deployment-HASH"
+var destinationServicePortName = "namespace/service-name:portname"
 var packetTotalCountFromOriginalSource = uint64(1005)
 var packetTotalCountFromGateway = uint64(999)
 var currTime = time.Now()
@@ -422,7 +423,7 @@ var fromOriginalSourceStats = &flowpb.Stats{
 func generateFromOriginalSourceFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 	fromOriginalSourceRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
-			DestinationServicePortName: "service-namespace/service-name:service-port-name",
+			DestinationServicePortName: destinationServicePortName,
 			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
 		},
 		Ip:           ipFromOriginalSource,
@@ -464,18 +465,15 @@ func TestCorrelationRequired(t *testing.T) {
 	t.Run("correlation is not required", func(t *testing.T) {
 		record := &flowpb.Flow{
 			K8S: &flowpb.Kubernetes{
-				DestinationPodName:         "nginx-deployment-79c8dcc9c4-nq8jp",
-				DestinationServicePortName: "namespace/service-name:portname",
+				DestinationPodName:         destinationPodName,
+				DestinationServicePortName: destinationServicePortName,
 			},
 		}
 		assert.False(t, correlationRequired(record))
 	})
 	t.Run("correlation is required", func(t *testing.T) {
 		record := &flowpb.Flow{
-			K8S: &flowpb.Kubernetes{
-				DestinationPodName:         "",
-				DestinationServicePortName: "",
-			},
+			K8S: &flowpb.Kubernetes{},
 		}
 		assert.True(t, correlationRequired(record))
 	})
