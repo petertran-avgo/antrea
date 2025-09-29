@@ -501,7 +501,7 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 			K8S: &flowpb.Kubernetes{
 				DestinationPodName:         destinationPodName,
 				FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
-				DestinationServicePortName: "namespace/service-name:portname",
+				DestinationServicePortName: destinationServicePortName,
 			},
 			Ip:           ipFromOriginalSource,
 			Transport:    sampleTransport,
@@ -514,6 +514,7 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 
 		ap.addOrUpdateRecordInMap(flowKey, record, false)
 		assert.NotNil(t, record.Aggregation)
+
 		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 		assert.NotNil(t, ap.expirePriorityQueue.Peek().flowRecord)
 		assert.True(t, ap.expirePriorityQueue.Peek().flowRecord.ReadyToSend)
@@ -533,8 +534,9 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 
 		ap.addOrUpdateRecordInMap(flowKeyfromOriginalSource, fromOriginalSourceRecord, false)
 		assert.NotNil(t, fromOriginalSourceRecord.Aggregation)
-		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 		assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
+
+		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 		assert.NotNil(t, ap.expirePriorityQueue.Peek().flowRecord)
 		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().activeExpireTime)
 		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().inactiveExpireTime)
@@ -567,7 +569,7 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 		assert.NotNil(t, ap.expirePriorityQueue.Peek().flowRecord)
 		assert.True(t, ap.expirePriorityQueue.Peek().flowRecord.ReadyToSend)
-		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.StatsFromSource)
+		assert.Equal(t, packetTotalCountFromOriginalSource, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.StatsFromSource.PacketTotalCount)
 		assert.Equal(t, throughPutFromOriginalSource, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.ThroughputFromSource)
 		assert.Equal(t, throughPutFromGateway, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.ThroughputFromDestination)
 		assert.Equal(t, packetTotalCountFromGateway, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.StatsFromDestination.PacketTotalCount)
