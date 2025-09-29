@@ -76,10 +76,10 @@ type AggregationInput struct {
 // Holds the two records that make up the FromExternal records
 type FromExternalFlowStash struct {
 	// The record from conntrack zone 0 containing the original source IP
-	FromOriginalSource *AggregationFlowRecord
+	SourceNodeFlow *AggregationFlowRecord
 	// The record from the antrea conntrack zone containing the destination
 	// pod information
-	FromGateway *AggregationFlowRecord
+	DestinationNodeFlow *AggregationFlowRecord
 }
 
 func initAggregationProcessWithClock(input AggregationInput, clock clock.Clock) (*aggregationProcess, error) {
@@ -416,8 +416,8 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 		klog.InfoS("record exists in externalipport map", "record", record)
 		if isSourceNodeRecord(record) {
 			klog.InfoS("record is to Gateway", "record", record)
-			if stash.FromGateway != nil {
-				record.K8S.DestinationPodName = stash.FromGateway.Record.K8S.DestinationPodName
+			if stash.DestinationNodeFlow != nil {
+				record.K8S.DestinationPodName = stash.DestinationNodeFlow.Record.K8S.DestinationPodName
 				pqItem := &ItemToExpire{
 					flowKey: flowKey,
 				}
@@ -433,7 +433,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
 				a.addFieldsForStatsAggregation(record, true, false)
 				a.addFieldsForThroughputCalculation(record, record, true, false)
-				a.addFieldsForThroughputCalculation(stash.FromGateway.Record, record, false, true)
+				a.addFieldsForThroughputCalculation(stash.DestinationNodeFlow.Record, record, false, true)
 
 				copyStats := func(from, to *flowpb.Stats) {
 					to.PacketTotalCount = from.PacketTotalCount
@@ -441,16 +441,16 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 					to.OctetTotalCount = from.OctetTotalCount
 					to.OctetDeltaCount = from.OctetDeltaCount
 				}
-				copyStats(stash.FromGateway.Record.Stats, record.Aggregation.StatsFromDestination)
+				copyStats(stash.DestinationNodeFlow.Record.Stats, record.Aggregation.StatsFromDestination)
 
 				heap.Push(&a.expirePriorityQueue, pqItem)
 			}
 		} else {
-			if stash.FromOriginalSource != nil {
-				aggregationRecord := stash.FromOriginalSource
+			if stash.SourceNodeFlow != nil {
+				aggregationRecord := stash.SourceNodeFlow
 				aggregationRecord.Record.K8S.DestinationPodName = record.K8S.DestinationPodName
 				aggregationRecord.ReadyToSend = true
-				klog.InfoS("record exists, received fromGateway record, filled it but didnt add it to queue", "record", record)
+				klog.InfoS("record exists, received DestinationNodeFlow record, filled it but didnt add it to queue", "record", record)
 				// Populate Destination Stats from stashed records
 				//TODO move this utility to it's own function
 				copyStats := func(from, to *flowpb.Stats) {
@@ -459,7 +459,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 					to.OctetTotalCount = from.OctetTotalCount
 					to.OctetDeltaCount = from.OctetDeltaCount
 				}
-				copyStats(record.Stats, stash.FromOriginalSource.Record.Aggregation.StatsFromDestination)
+				copyStats(record.Stats, stash.SourceNodeFlow.Record.Aggregation.StatsFromDestination)
 				a.addFieldsForThroughputCalculation(record, aggregationRecord.Record, false, true)
 			}
 		}
@@ -486,7 +486,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			a.addFieldsForThroughputCalculation(record, record, true, false)
 
 			heap.Push(&a.expirePriorityQueue, pqItem)
-			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{FromOriginalSource: aggregationRecord} // TODO double check this is being deleted over time
+			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{SourceNodeFlow: aggregationRecord} // TODO double check this is being deleted over time
 		} else {
 			klog.InfoS("record s not to gateway so it's not added to the queue", "record", record)
 			aggregationRecord := &AggregationFlowRecord{
@@ -495,7 +495,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				waitForReadyToSendRetries: 0,
 				isIPv4:                    false,
 			}
-			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{FromGateway: aggregationRecord}
+			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{DestinationNodeFlow: aggregationRecord}
 		}
 	}
 }
