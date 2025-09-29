@@ -389,23 +389,23 @@ func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
 
 var destinationPodName = "nginx-deployment-HASH"
 var destinationServicePortName = "namespace/service-name:portname"
-var packetTotalCountFromOriginalSource = uint64(1005)
-var packetTotalCountFromGateway = uint64(999)
+var sourceNodePackets = uint64(1005)
+var destinationNodePackets = uint64(999)
 var currTime = time.Now()
-var fromOriginalSourceWindow = 1 * time.Minute
-var fromOriginalSourceStart = timestamppb.New(currTime)
-var fromOriginalSourceEnd = timestamppb.New(currTime.Add(fromOriginalSourceWindow))
+var sourceNodeWindow = 1 * time.Minute
+var sourceNodeStart = timestamppb.New(currTime)
+var sourceNodeEnd = timestamppb.New(currTime.Add(sourceNodeWindow))
 var octetTotalCount = uint64(2050)
 
 // TODO pull this out into a helper function
-var throughPutFromOriginalSource = octetTotalCount * 8 / uint64(fromOriginalSourceEnd.Seconds-fromOriginalSourceStart.Seconds)
+var sourceNodeThroughPut = octetTotalCount * 8 / uint64(sourceNodeEnd.Seconds-sourceNodeStart.Seconds)
 
-var fromGatewayWindow = 2 * time.Minute
-var fromGatewayStart = timestamppb.New(currTime)
-var fromGatewayEnd = timestamppb.New(currTime.Add(fromGatewayWindow))
-var throughPutFromGateway = octetTotalCount * 8 / uint64(fromGatewayEnd.Seconds-fromGatewayStart.Seconds)
+var destinationNodeWindow = 2 * time.Minute
+var destinationNodeStart = timestamppb.New(currTime)
+var destinationNodeEnd = timestamppb.New(currTime.Add(destinationNodeWindow))
+var destinationNodeThroughPut = octetTotalCount * 8 / uint64(destinationNodeEnd.Seconds-destinationNodeStart.Seconds)
 
-var ipFromOriginalSource = &flowpb.IP{
+var sourceNodeIP = &flowpb.IP{
 	Source:      []byte{0xac, 0x12, 0x00, 0x01}, // 172.12.18.01
 	Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
 }
@@ -415,29 +415,29 @@ var sampleTransport = &flowpb.Transport{
 	DestinationPort: 80,
 }
 
-var fromOriginalSourceStats = &flowpb.Stats{
-	PacketTotalCount: packetTotalCountFromOriginalSource,
+var sourceNodeStats = &flowpb.Stats{
+	PacketTotalCount: sourceNodePackets,
 	OctetTotalCount:  octetTotalCount,
 }
 
-func generateFromOriginalSourceFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
-	fromOriginalSourceRecord := &flowpb.Flow{
+func generateSourceNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
+	sourceNodeRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
 			DestinationServicePortName: destinationServicePortName,
 			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
 		},
-		Ip:           ipFromOriginalSource,
+		Ip:           sourceNodeIP,
 		Transport:    sampleTransport,
-		Stats:        fromOriginalSourceStats,
+		Stats:        sourceNodeStats,
 		ReverseStats: &flowpb.Stats{},
-		StartTs:      fromOriginalSourceStart,
-		EndTs:        fromOriginalSourceEnd,
+		StartTs:      sourceNodeStart,
+		EndTs:        sourceNodeEnd,
 	}
-	flowKeyfromOriginalSource, _ := getFlowKeyFromRecord(fromOriginalSourceRecord)
-	return fromOriginalSourceRecord, flowKeyfromOriginalSource
+	sourceNodeFlowKey, _ := getFlowKeyFromRecord(sourceNodeRecord)
+	return sourceNodeRecord, sourceNodeFlowKey
 }
-func generateFromGatewayFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
-	fromGatewayRecord := &flowpb.Flow{
+func generateDestinationNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
+	destinationNodeRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
 			DestinationPodName: destinationPodName,
 			FlowType:           flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
@@ -448,15 +448,15 @@ func generateFromGatewayFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 		},
 		Transport: sampleTransport,
 		Stats: &flowpb.Stats{
-			PacketTotalCount: packetTotalCountFromGateway,
+			PacketTotalCount: destinationNodePackets,
 			OctetTotalCount:  octetTotalCount,
 		},
 		ReverseStats: &flowpb.Stats{},
-		StartTs:      fromGatewayStart,
-		EndTs:        fromGatewayEnd,
+		StartTs:      destinationNodeStart,
+		EndTs:        destinationNodeEnd,
 	}
-	flowKeyFromGateway, _ := getFlowKeyFromRecord(fromGatewayRecord)
-	return fromGatewayRecord, flowKeyFromGateway
+	destinationNodeFlowKey, _ := getFlowKeyFromRecord(destinationNodeRecord)
+	return destinationNodeRecord, destinationNodeFlowKey
 }
 
 // TestCorrelationRequired validates the logic behind wether or not a FromExternal flow
@@ -495,22 +495,22 @@ func newAggregationProcess() *aggregationProcess {
 func assertCorrelatedStats(t *testing.T, flowRecord *AggregationFlowRecord) {
 	aggregation := flowRecord.Record.Aggregation
 	assertStats(t, aggregation)
-	assert.Equal(t, packetTotalCountFromGateway, aggregation.StatsFromDestination.PacketTotalCount)
-	assert.Equal(t, throughPutFromGateway, aggregation.ThroughputFromDestination)
+	assert.Equal(t, destinationNodePackets, aggregation.StatsFromDestination.PacketTotalCount)
+	assert.Equal(t, destinationNodeThroughPut, aggregation.ThroughputFromDestination)
 }
 
 func assertStats(t *testing.T, aggregation *flowpb.Aggregation) {
 	assert.NotNil(t, aggregation.StatsFromSource)
 	assert.NotNil(t, aggregation.StatsFromDestination)
-	assert.Equal(t, packetTotalCountFromOriginalSource, aggregation.StatsFromSource.PacketTotalCount)
-	assert.Equal(t, throughPutFromOriginalSource, aggregation.ThroughputFromSource)
+	assert.Equal(t, sourceNodePackets, aggregation.StatsFromSource.PacketTotalCount)
+	assert.Equal(t, sourceNodeThroughPut, aggregation.ThroughputFromSource)
 }
 
 func assertUncorrelatedStats(t *testing.T, flowRecord *AggregationFlowRecord) {
 	aggregation := flowRecord.Record.Aggregation
 	assertStats(t, aggregation)
-	assert.Equal(t, packetTotalCountFromOriginalSource, aggregation.StatsFromDestination.PacketTotalCount)
-	assert.Equal(t, throughPutFromOriginalSource, aggregation.ThroughputFromDestination)
+	assert.Equal(t, sourceNodePackets, aggregation.StatsFromDestination.PacketTotalCount)
+	assert.Equal(t, sourceNodeThroughPut, aggregation.ThroughputFromDestination)
 }
 
 func assertPriorityQueueRecordInitialized(t *testing.T, ap *aggregationProcess) {
@@ -528,7 +528,7 @@ func assertUpdated(t *testing.T, record *AggregationFlowRecord) {
 }
 
 // TestCorrelateRecordsForFromExternalFlow validates flows received by the FlowAggregator
-// are correctly correlated as they come from 2 zones with different information
+// are correctly correlated as they come from the source node and destination node
 func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 	t.Run("correlation not required because the external to pod connection happen to hit the node that had the pod", func(t *testing.T) {
 		ap := newAggregationProcess()
@@ -538,12 +538,12 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 				FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
 				DestinationServicePortName: destinationServicePortName,
 			},
-			Ip:           ipFromOriginalSource,
+			Ip:           sourceNodeIP,
 			Transport:    sampleTransport,
-			Stats:        fromOriginalSourceStats,
+			Stats:        sourceNodeStats,
 			ReverseStats: &flowpb.Stats{},
-			StartTs:      fromOriginalSourceStart,
-			EndTs:        fromOriginalSourceEnd,
+			StartTs:      sourceNodeStart,
+			EndTs:        sourceNodeEnd,
 		}
 		flowKey, _ := getFlowKeyFromRecord(record)
 
@@ -554,10 +554,10 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assertUpdated(t, recordForExport)
 		assertUncorrelatedStats(t, recordForExport)
 	})
-	t.Run("fromOrignalSource arrives first", func(t *testing.T) {
+	t.Run("source node flow arrives first", func(t *testing.T) {
 		ap := newAggregationProcess()
-		fromGatewayRecord, flowKeyFromGateway := generateFromGatewayFlowAndFlowKey()
-		fromOriginalSourceRecord, flowKeyfromOriginalSource := generateFromOriginalSourceFlowAndFlowKey()
+		fromGatewayRecord, flowKeyFromGateway := generateDestinationNodeFlowAndFlowKey()
+		fromOriginalSourceRecord, flowKeyfromOriginalSource := generateSourceNodeFlowAndFlowKey()
 
 		ap.addOrUpdateRecordInMap(flowKeyfromOriginalSource, fromOriginalSourceRecord, false)
 
@@ -573,11 +573,11 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assertCorrelatedStats(t, recordForExport)
 	})
 
-	t.Run("fromGateway arrives first", func(t *testing.T) {
+	t.Run("destination node flow arrives first", func(t *testing.T) {
 		ap := newAggregationProcess()
 
-		fromGatewayRecord, flowKeyFromGateway := generateFromGatewayFlowAndFlowKey()
-		fromOriginalSourceRecord, flowKeyfromOriginalSource := generateFromOriginalSourceFlowAndFlowKey()
+		fromGatewayRecord, flowKeyFromGateway := generateDestinationNodeFlowAndFlowKey()
+		fromOriginalSourceRecord, flowKeyfromOriginalSource := generateSourceNodeFlowAndFlowKey()
 
 		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
 		assert.Nil(t, fromGatewayRecord.Aggregation)
@@ -592,18 +592,17 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assertCorrelatedStats(t, recordForExport)
 	})
 
-	t.Run("fromOriginalSource arrives multiple times", func(t *testing.T) {
+	t.Run("source node flow arrives multiple times", func(t *testing.T) {
 		ap := newAggregationProcess()
-		fromOriginalSourceRecord, flowKeyfromOriginalSource := generateFromOriginalSourceFlowAndFlowKey()
+		fromOriginalSourceRecord, flowKeyfromOriginalSource := generateSourceNodeFlowAndFlowKey()
 
 		ap.addOrUpdateRecordInMap(flowKeyfromOriginalSource, fromOriginalSourceRecord, false)
 		// Second add does not panic
 		ap.addOrUpdateRecordInMap(flowKeyfromOriginalSource, fromOriginalSourceRecord, false)
 	})
-	t.Run("fromGateway arrives multiple times", func(t *testing.T) {
+	t.Run("destionation node flow arrives multiple times", func(t *testing.T) {
 		ap := newAggregationProcess()
-
-		fromGatewayRecord, flowKeyFromGateway := generateFromGatewayFlowAndFlowKey()
+		fromGatewayRecord, flowKeyFromGateway := generateDestinationNodeFlowAndFlowKey()
 
 		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
 		// Second add does not panic
