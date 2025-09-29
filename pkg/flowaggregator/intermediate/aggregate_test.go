@@ -507,8 +507,8 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 			Transport:    sampleTransport,
 			Stats:        fromOriginalSourceStats,
 			ReverseStats: &flowpb.Stats{},
-			StartTs:      timestamppb.New(time.Now()),
-			EndTs:        timestamppb.New(time.Now().Add(1 * time.Minute)),
+			StartTs:      fromOriginalSourceStart,
+			EndTs:        fromOriginalSourceEnd,
 		}
 		flowKey, _ := getFlowKeyFromRecord(record)
 
@@ -522,8 +522,8 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.Equal(t, packetTotalCountFromOriginalSource, record.Aggregation.StatsFromSource.PacketTotalCount)
 		assert.NotNil(t, record.Aggregation.StatsFromDestination)
 		assert.Equal(t, packetTotalCountFromOriginalSource, record.Aggregation.StatsFromDestination.PacketTotalCount)
-		assert.NotEmpty(t, record.Aggregation.ThroughputFromSource)
-		assert.NotEmpty(t, record.Aggregation.ThroughputFromDestination)
+		assert.Equal(t, throughPutFromOriginalSource, record.Aggregation.ThroughputFromSource)
+		assert.Equal(t, throughPutFromOriginalSource, record.Aggregation.ThroughputFromDestination)
 
 	})
 	t.Run("fromOrignalSource arrives first", func(t *testing.T) {
