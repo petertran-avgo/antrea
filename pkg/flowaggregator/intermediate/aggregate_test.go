@@ -404,16 +404,18 @@ var fromGatewayStart = timestamppb.New(currTime)
 var fromGatewayEnd = timestamppb.New(currTime.Add(fromGatewayWindow))
 var throughPutFromGateway = octetTotalCount * 8 / uint64(fromGatewayEnd.Seconds-fromGatewayStart.Seconds)
 
+var ipFromOriginalSource = &flowpb.IP{
+	Source:      []byte{0xac, 0x12, 0x00, 0x01}, // 172.12.18.01
+	Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
+}
+
 func generateFromOriginalSourceFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 	fromOriginalSourceRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
 			DestinationServicePortName: "service-namespace/service-name:service-port-name",
 			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
 		},
-		Ip: &flowpb.IP{
-			Source:      []byte{0xac, 0x12, 0x00, 0x01}, // 172.18.0.1
-			Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
-		},
+		Ip: ipFromOriginalSource,
 		Transport: &flowpb.Transport{
 			ProtocolNumber:  6,
 			SourcePort:      50634,
@@ -480,29 +482,31 @@ func TestCorrelationRequired(t *testing.T) {
 	})
 }
 
+func newAggregationProcess() *aggregationProcess {
+	recordChan := make(chan *flowpb.Flow)
+	input := AggregationInput{
+		RecordChan:            recordChan,
+		WorkerNum:             2,
+		ActiveExpiryTimeout:   testActiveExpiry,
+		InactiveExpiryTimeout: testInactiveExpiry,
+	}
+	clock := clocktesting.NewFakeClock(time.Now())
+	ap, _ := initAggregationProcessWithClock(input, clock)
+	return ap
+}
+
 // TestCorrelateRecordsForFromExternalFlow validates flows received by the FlowAggregator
 // are correctly correlated as they come from 2 zones with different information
 func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 	t.Run("correlation not required because the external to pod connection happen to hit the node that had the pod", func(t *testing.T) {
-		recordChan := make(chan *flowpb.Flow)
-		input := AggregationInput{
-			RecordChan:            recordChan,
-			WorkerNum:             2,
-			ActiveExpiryTimeout:   testActiveExpiry,
-			InactiveExpiryTimeout: testInactiveExpiry,
-		}
-		clock := clocktesting.NewFakeClock(time.Now())
-		ap, _ := initAggregationProcessWithClock(input, clock)
+		ap := newAggregationProcess()
 		record := &flowpb.Flow{
 			K8S: &flowpb.Kubernetes{
-				DestinationPodName:         "nginx-deployment-79c8dcc9c4-nq8jp",
+				DestinationPodName:         destinationPodName,
 				FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
 				DestinationServicePortName: "namespace/service-name:portname",
 			},
-			Ip: &flowpb.IP{
-				Source:      []byte{0xac, 0x12, 0x00, 0x01}, // 172.12.18.01
-				Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
-			},
+			Ip: ipFromOriginalSource,
 			Transport: &flowpb.Transport{
 				ProtocolNumber:  6,
 				SourcePort:      13914,
@@ -532,15 +536,7 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 
 	})
 	t.Run("fromOrignalSource arrives first", func(t *testing.T) {
-		recordChan := make(chan *flowpb.Flow)
-		input := AggregationInput{
-			RecordChan:            recordChan,
-			WorkerNum:             2,
-			ActiveExpiryTimeout:   testActiveExpiry,
-			InactiveExpiryTimeout: testInactiveExpiry,
-		}
-		clock := clocktesting.NewFakeClock(time.Now())
-		ap, _ := initAggregationProcessWithClock(input, clock)
+		ap := newAggregationProcess()
 
 		fromGatewayRecord, flowKeyFromGateway := generateFromGatewayFlowAndFlowKey()
 		fromOriginalSourceRecord, flowKeyfromOriginalSource := generateFromOriginalSourceFlowAndFlowKey()
@@ -566,15 +562,7 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 	})
 
 	t.Run("fromGateway arrives first", func(t *testing.T) {
-		recordChan := make(chan *flowpb.Flow)
-		input := AggregationInput{
-			RecordChan:            recordChan,
-			WorkerNum:             2,
-			ActiveExpiryTimeout:   testActiveExpiry,
-			InactiveExpiryTimeout: testInactiveExpiry,
-		}
-		clock := clocktesting.NewFakeClock(time.Now())
-		ap, _ := initAggregationProcessWithClock(input, clock)
+		ap := newAggregationProcess()
 
 		fromGatewayRecord, flowKeyFromGateway := generateFromGatewayFlowAndFlowKey()
 		fromOriginalSourceRecord, flowKeyfromOriginalSource := generateFromOriginalSourceFlowAndFlowKey()
@@ -596,35 +584,20 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 	})
 
 	t.Run("fromOriginalSource arrives multiple times", func(t *testing.T) {
-		recordChan := make(chan *flowpb.Flow)
-		input := AggregationInput{
-			RecordChan:            recordChan,
-			WorkerNum:             2,
-			ActiveExpiryTimeout:   testActiveExpiry,
-			InactiveExpiryTimeout: testInactiveExpiry,
-		}
-		clock := clocktesting.NewFakeClock(time.Now())
-		ap, _ := initAggregationProcessWithClock(input, clock)
-
+		ap := newAggregationProcess()
 		fromOriginalSourceRecord, flowKeyfromOriginalSource := generateFromOriginalSourceFlowAndFlowKey()
 
 		ap.addOrUpdateRecordInMap(flowKeyfromOriginalSource, fromOriginalSourceRecord, false)
+		// Second add does not panic
 		ap.addOrUpdateRecordInMap(flowKeyfromOriginalSource, fromOriginalSourceRecord, false)
 	})
 	t.Run("fromGateway arrives multiple times", func(t *testing.T) {
-		recordChan := make(chan *flowpb.Flow)
-		input := AggregationInput{
-			RecordChan:            recordChan,
-			WorkerNum:             2,
-			ActiveExpiryTimeout:   testActiveExpiry,
-			InactiveExpiryTimeout: testInactiveExpiry,
-		}
-		clock := clocktesting.NewFakeClock(time.Now())
-		ap, _ := initAggregationProcessWithClock(input, clock)
+		ap := newAggregationProcess()
 
 		fromGatewayRecord, flowKeyFromGateway := generateFromGatewayFlowAndFlowKey()
 
 		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
+		// Second add does not panic
 		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
 	})
 }
