@@ -590,9 +590,9 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.NotNil(t, ap.expirePriorityQueue.Peek().flowRecord)
 		assert.True(t, ap.expirePriorityQueue.Peek().flowRecord.ReadyToSend)
 		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.StatsFromSource)
-		assert.Empty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.StatsFromDestination)
-		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.ThroughputFromSource)
-		assert.Empty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.ThroughputFromDestination)
+		assert.Equal(t, throughPutFromOriginalSource, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.ThroughputFromSource)
+		assert.Equal(t, throughPutFromGateway, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.ThroughputFromDestination)
+		assert.Equal(t, packetTotalCountFromGateway, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.StatsFromDestination.PacketTotalCount)
 	})
 
 	t.Run("fromOriginalSource arrives multiple times", func(t *testing.T) {

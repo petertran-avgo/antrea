@@ -429,6 +429,16 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				pqItem.flowRecord = aggregationRecord
 				a.addFieldsForStatsAggregation(record, true, false)
 				a.addFieldsForThroughputCalculation(record, record, true, false)
+				a.addFieldsForThroughputCalculation(stash.FromGateway.Record, record, false, true)
+
+				copyStats := func(from, to *flowpb.Stats) {
+					to.PacketTotalCount = from.PacketTotalCount
+					to.PacketDeltaCount = from.PacketDeltaCount
+					to.OctetTotalCount = from.OctetTotalCount
+					to.OctetDeltaCount = from.OctetDeltaCount
+				}
+				copyStats(stash.FromGateway.Record.Stats, record.Aggregation.StatsFromDestination)
+
 				heap.Push(&a.expirePriorityQueue, pqItem)
 			}
 		} else {
