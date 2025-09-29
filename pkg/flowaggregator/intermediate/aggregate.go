@@ -395,7 +395,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 		record.Aggregation = &flowpb.Aggregation{}
 		pqItem.flowRecord = aggregationRecord
 		a.addFieldsForStatsAggregation(record, true, true)
-		a.addFieldsForThroughputCalculation(record, true, true)
+		a.addFieldsForThroughputCalculation(record, record, true, true)
 
 		heap.Push(&a.expirePriorityQueue, pqItem)
 		return
@@ -412,7 +412,6 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 	klog.InfoS("received FromExternal record", "record", record, "key", key)
 	if exists {
 		klog.InfoS("record exists in externalipport map", "record", record)
-		//TODO: perhaps we can distinguish these two records based on zone info instead of gateway
 		if fromOriginalSource(record) {
 			klog.InfoS("record is to Gateway", "record", record)
 			if stash.FromGateway != nil {
@@ -429,7 +428,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				record.Aggregation = &flowpb.Aggregation{}
 				pqItem.flowRecord = aggregationRecord
 				a.addFieldsForStatsAggregation(record, true, false)
-				a.addFieldsForThroughputCalculation(record, true, false)
+				a.addFieldsForThroughputCalculation(record, record, true, false)
 				heap.Push(&a.expirePriorityQueue, pqItem)
 			}
 		} else {
@@ -438,6 +437,16 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				aggregationRecord.Record.K8S.DestinationPodName = record.K8S.DestinationPodName
 				aggregationRecord.ReadyToSend = true
 				klog.InfoS("record exists, received fromGateway record, filled it but didnt add it to queue", "record", record)
+				// Populate Destination Stats from stashed records
+				//TODO move this utility to it's own function
+				copyStats := func(from, to *flowpb.Stats) {
+					to.PacketTotalCount = from.PacketTotalCount
+					to.PacketDeltaCount = from.PacketDeltaCount
+					to.OctetTotalCount = from.OctetTotalCount
+					to.OctetDeltaCount = from.OctetDeltaCount
+				}
+				copyStats(record.Stats, stash.FromOriginalSource.Record.Aggregation.StatsFromDestination)
+				a.addFieldsForThroughputCalculation(record, aggregationRecord.Record, false, true)
 			}
 		}
 	} else {
@@ -460,7 +469,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
 			pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
 			a.addFieldsForStatsAggregation(record, true, false)
-			a.addFieldsForThroughputCalculation(record, true, false)
+			a.addFieldsForThroughputCalculation(record, record, true, false)
 
 			heap.Push(&a.expirePriorityQueue, pqItem)
 			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{FromOriginalSource: aggregationRecord} // TODO double check this is being deleted over time
@@ -523,14 +532,14 @@ func (a *aggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record *fl
 		if correlationRequired {
 			if isRecordFromSrc(record) {
 				a.addFieldsForStatsAggregation(record, true, false)
-				a.addFieldsForThroughputCalculation(record, true, false)
+				a.addFieldsForThroughputCalculation(record, record, true, false)
 			} else {
 				a.addFieldsForStatsAggregation(record, false, true)
-				a.addFieldsForThroughputCalculation(record, false, true)
+				a.addFieldsForThroughputCalculation(record, record, false, true)
 			}
 		} else {
 			a.addFieldsForStatsAggregation(record, true, true)
-			a.addFieldsForThroughputCalculation(record, true, true)
+			a.addFieldsForThroughputCalculation(record, record, true, true)
 		}
 		aggregationRecord = &AggregationFlowRecord{
 			Record:                    record,
@@ -812,19 +821,19 @@ func (a *aggregationProcess) addFieldsForStatsAggregation(record *flowpb.Flow, f
 	}
 }
 
-func (a *aggregationProcess) addFieldsForThroughputCalculation(record *flowpb.Flow, fillSrcStats, fillDstStats bool) {
-	timeStart := record.StartTs.Seconds
-	timeEnd := record.EndTs.Seconds
-	byteCount := record.Stats.OctetTotalCount
-	reverseByteCount := record.ReverseStats.OctetTotalCount
+func (a *aggregationProcess) addFieldsForThroughputCalculation(from, to *flowpb.Flow, fillSrcStats, fillDstStats bool) {
+	timeStart := from.StartTs.Seconds
+	timeEnd := from.EndTs.Seconds
+	byteCount := from.Stats.OctetTotalCount
+	reverseByteCount := from.ReverseStats.OctetTotalCount
 
-	record.Aggregation.EndTsFromSource = &timestamppb.Timestamp{}
+	to.Aggregation.EndTsFromSource = &timestamppb.Timestamp{}
 	if fillSrcStats {
-		record.Aggregation.EndTsFromSource.Seconds = timeEnd
+		to.Aggregation.EndTsFromSource.Seconds = timeEnd
 	}
-	record.Aggregation.EndTsFromDestination = &timestamppb.Timestamp{}
+	to.Aggregation.EndTsFromDestination = &timestamppb.Timestamp{}
 	if fillDstStats {
-		record.Aggregation.EndTsFromDestination.Seconds = timeEnd
+		to.Aggregation.EndTsFromDestination.Seconds = timeEnd
 	}
 
 	// Initialize the throughput elements.
@@ -835,15 +844,15 @@ func (a *aggregationProcess) addFieldsForThroughputCalculation(record *flowpb.Fl
 		throughput = byteCount * 8 / uint64(timeEnd-timeStart)
 		reverseThroughput = reverseByteCount * 8 / uint64(timeEnd-timeStart)
 	}
-	record.Aggregation.Throughput = throughput
-	record.Aggregation.ReverseThroughput = reverseThroughput
+	to.Aggregation.Throughput = throughput
+	to.Aggregation.ReverseThroughput = reverseThroughput
 	if fillSrcStats {
-		record.Aggregation.ThroughputFromSource = throughput
-		record.Aggregation.ReverseThroughputFromSource = reverseThroughput
+		to.Aggregation.ThroughputFromSource = throughput
+		to.Aggregation.ReverseThroughputFromSource = reverseThroughput
 	}
 	if fillDstStats {
-		record.Aggregation.ThroughputFromDestination = throughput
-		record.Aggregation.ReverseThroughputFromDestination = reverseThroughput
+		to.Aggregation.ThroughputFromDestination = throughput
+		to.Aggregation.ReverseThroughputFromDestination = reverseThroughput
 	}
 }
 

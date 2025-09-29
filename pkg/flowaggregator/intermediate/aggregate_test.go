@@ -389,6 +389,20 @@ func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
 
 var destinationPodName = "nginx-deployment-HASH"
 var packetTotalCountFromOriginalSource = uint64(1005)
+var packetTotalCountFromGateway = uint64(999)
+var currTime = time.Now()
+var fromOriginalSourceWindow = 1 * time.Minute
+var fromOriginalSourceStart = timestamppb.New(currTime)
+var fromOriginalSourceEnd = timestamppb.New(currTime.Add(fromOriginalSourceWindow))
+var octetTotalCount = uint64(2050)
+
+// TODO pull this out into a helper function
+var throughPutFromOriginalSource = octetTotalCount * 8 / uint64(fromOriginalSourceEnd.Seconds-fromOriginalSourceStart.Seconds)
+
+var fromGatewayWindow = 2 * time.Minute
+var fromGatewayStart = timestamppb.New(currTime)
+var fromGatewayEnd = timestamppb.New(currTime.Add(fromGatewayWindow))
+var throughPutFromGateway = octetTotalCount * 8 / uint64(fromGatewayEnd.Seconds-fromGatewayStart.Seconds)
 
 func generateFromOriginalSourceFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 	fromOriginalSourceRecord := &flowpb.Flow{
@@ -407,11 +421,11 @@ func generateFromOriginalSourceFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 		},
 		Stats: &flowpb.Stats{
 			PacketTotalCount: packetTotalCountFromOriginalSource,
-			OctetTotalCount:  2050,
+			OctetTotalCount:  octetTotalCount,
 		},
 		ReverseStats: &flowpb.Stats{},
-		StartTs:      timestamppb.New(time.Now()),
-		EndTs:        timestamppb.New(time.Now().Add(1 * time.Minute)),
+		StartTs:      fromOriginalSourceStart,
+		EndTs:        fromOriginalSourceEnd,
 	}
 	flowKeyfromOriginalSource, _ := getFlowKeyFromRecord(fromOriginalSourceRecord)
 	return fromOriginalSourceRecord, flowKeyfromOriginalSource
@@ -431,10 +445,13 @@ func generateFromGatewayFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 			SourcePort:      13914,
 			DestinationPort: 80,
 		},
-		Stats:        &flowpb.Stats{},
+		Stats: &flowpb.Stats{
+			PacketTotalCount: packetTotalCountFromGateway,
+			OctetTotalCount:  octetTotalCount,
+		},
 		ReverseStats: &flowpb.Stats{},
-		StartTs:      timestamppb.New(time.Time{}),
-		EndTs:        timestamppb.New(time.Time{}),
+		StartTs:      fromGatewayStart,
+		EndTs:        fromGatewayEnd,
 	}
 	flowKeyFromGateway, _ := getFlowKeyFromRecord(fromGatewayRecord)
 	return fromGatewayRecord, flowKeyFromGateway
@@ -493,7 +510,7 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 			},
 			Stats: &flowpb.Stats{
 				PacketTotalCount: packetTotalCountFromOriginalSource,
-				OctetTotalCount:  2050,
+				OctetTotalCount:  octetTotalCount,
 			},
 			ReverseStats: &flowpb.Stats{},
 			StartTs:      timestamppb.New(time.Now()),
@@ -542,10 +559,10 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 		assert.True(t, ap.expirePriorityQueue.Peek().flowRecord.ReadyToSend)
 
-		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.StatsFromSource)
-		assert.Empty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.StatsFromDestination)
-		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.ThroughputFromSource)
-		assert.Empty(t, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.ThroughputFromDestination)
+		assert.Equal(t, packetTotalCountFromOriginalSource, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.StatsFromSource.PacketTotalCount)
+		assert.Equal(t, packetTotalCountFromGateway, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.StatsFromDestination.PacketTotalCount)
+		assert.Equal(t, throughPutFromOriginalSource, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.ThroughputFromSource)
+		assert.Equal(t, throughPutFromGateway, ap.expirePriorityQueue.Peek().flowRecord.Record.Aggregation.ThroughputFromDestination)
 	})
 
 	t.Run("fromGateway arrives first", func(t *testing.T) {
