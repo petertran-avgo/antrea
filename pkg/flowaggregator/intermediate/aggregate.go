@@ -427,6 +427,8 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				}
 				record.Aggregation = &flowpb.Aggregation{}
 				pqItem.flowRecord = aggregationRecord
+				pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
+				pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
 				a.addFieldsForStatsAggregation(record, true, false)
 				a.addFieldsForThroughputCalculation(record, record, true, false)
 				a.addFieldsForThroughputCalculation(stash.FromGateway.Record, record, false, true)

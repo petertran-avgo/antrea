@@ -536,7 +536,6 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.Equal(t, packetTotalCountFromOriginalSource, record.Aggregation.StatsFromDestination.PacketTotalCount)
 		assert.Equal(t, throughPutFromOriginalSource, record.Aggregation.ThroughputFromSource)
 		assert.Equal(t, throughPutFromOriginalSource, record.Aggregation.ThroughputFromDestination)
-
 	})
 	t.Run("fromOrignalSource arrives first", func(t *testing.T) {
 		ap := newAggregationProcess()
@@ -580,6 +579,8 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 
 		recordForExport := ap.expirePriorityQueue.Peek().flowRecord
 		assert.NotNil(t, recordForExport)
+		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().activeExpireTime)
+		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().inactiveExpireTime)
 		assert.True(t, recordForExport.ReadyToSend)
 		assertStats(t, recordForExport)
 	})
