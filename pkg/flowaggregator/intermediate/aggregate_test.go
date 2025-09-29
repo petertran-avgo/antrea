@@ -408,6 +408,16 @@ var ipFromOriginalSource = &flowpb.IP{
 	Source:      []byte{0xac, 0x12, 0x00, 0x01}, // 172.12.18.01
 	Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
 }
+var sampleTransport = &flowpb.Transport{
+	ProtocolNumber:  6,
+	SourcePort:      50634,
+	DestinationPort: 80,
+}
+
+var fromOriginalSourceStats = &flowpb.Stats{
+	PacketTotalCount: packetTotalCountFromOriginalSource,
+	OctetTotalCount:  octetTotalCount,
+}
 
 func generateFromOriginalSourceFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 	fromOriginalSourceRecord := &flowpb.Flow{
@@ -415,16 +425,9 @@ func generateFromOriginalSourceFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 			DestinationServicePortName: "service-namespace/service-name:service-port-name",
 			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
 		},
-		Ip: ipFromOriginalSource,
-		Transport: &flowpb.Transport{
-			ProtocolNumber:  6,
-			SourcePort:      50634,
-			DestinationPort: 80,
-		},
-		Stats: &flowpb.Stats{
-			PacketTotalCount: packetTotalCountFromOriginalSource,
-			OctetTotalCount:  octetTotalCount,
-		},
+		Ip:           ipFromOriginalSource,
+		Transport:    sampleTransport,
+		Stats:        fromOriginalSourceStats,
 		ReverseStats: &flowpb.Stats{},
 		StartTs:      fromOriginalSourceStart,
 		EndTs:        fromOriginalSourceEnd,
@@ -442,11 +445,7 @@ func generateFromGatewayFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 			Source:      []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
 			Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
 		},
-		Transport: &flowpb.Transport{
-			ProtocolNumber:  6,
-			SourcePort:      13914,
-			DestinationPort: 80,
-		},
+		Transport: sampleTransport,
 		Stats: &flowpb.Stats{
 			PacketTotalCount: packetTotalCountFromGateway,
 			OctetTotalCount:  octetTotalCount,
@@ -506,16 +505,9 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 				FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
 				DestinationServicePortName: "namespace/service-name:portname",
 			},
-			Ip: ipFromOriginalSource,
-			Transport: &flowpb.Transport{
-				ProtocolNumber:  6,
-				SourcePort:      13914,
-				DestinationPort: 80,
-			},
-			Stats: &flowpb.Stats{
-				PacketTotalCount: packetTotalCountFromOriginalSource,
-				OctetTotalCount:  octetTotalCount,
-			},
+			Ip:           ipFromOriginalSource,
+			Transport:    sampleTransport,
+			Stats:        fromOriginalSourceStats,
 			ReverseStats: &flowpb.Stats{},
 			StartTs:      timestamppb.New(time.Now()),
 			EndTs:        timestamppb.New(time.Now().Add(1 * time.Minute)),
