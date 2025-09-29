@@ -417,7 +417,8 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 		if isSourceNodeRecord(record) {
 			klog.InfoS("record is to Gateway", "record", record)
 			if stash.DestinationNodeFlow != nil {
-				record.K8S.DestinationPodName = stash.DestinationNodeFlow.Record.K8S.DestinationPodName
+				stashedRecord := stash.DestinationNodeFlow.Record
+				record.K8S.DestinationPodName = stashedRecord.K8S.DestinationPodName
 				pqItem := &ItemToExpire{
 					flowKey: flowKey,
 				}
@@ -433,14 +434,8 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
 				a.addFieldsForStatsAggregation(record, true, false)
 				a.addFieldsForThroughputCalculation(record, record, true, false)
-				a.addFieldsForThroughputCalculation(stash.DestinationNodeFlow.Record, record, false, true)
+				a.addFieldsForThroughputCalculation(stashedRecord, record, false, true)
 
-				copyStats := func(from, to *flowpb.Stats) {
-					to.PacketTotalCount = from.PacketTotalCount
-					to.PacketDeltaCount = from.PacketDeltaCount
-					to.OctetTotalCount = from.OctetTotalCount
-					to.OctetDeltaCount = from.OctetDeltaCount
-				}
 				copyStats(stash.DestinationNodeFlow.Record.Stats, record.Aggregation.StatsFromDestination)
 
 				heap.Push(&a.expirePriorityQueue, pqItem)
@@ -452,14 +447,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				aggregationRecord.ReadyToSend = true
 				klog.InfoS("record exists, received DestinationNodeFlow record, filled it but didnt add it to queue", "record", record)
 				// Populate Destination Stats from stashed records
-				//TODO move this utility to it's own function
-				copyStats := func(from, to *flowpb.Stats) {
-					to.PacketTotalCount = from.PacketTotalCount
-					to.PacketDeltaCount = from.PacketDeltaCount
-					to.OctetTotalCount = from.OctetTotalCount
-					to.OctetDeltaCount = from.OctetDeltaCount
-				}
-				copyStats(record.Stats, stash.SourceNodeFlow.Record.Aggregation.StatsFromDestination)
+				copyStats(record.Stats, aggregationRecord.Record.Aggregation.StatsFromDestination)
 				a.addFieldsForThroughputCalculation(record, aggregationRecord.Record, false, true)
 			}
 		}
@@ -813,17 +801,18 @@ func (a *aggregationProcess) ResetStatAndThroughputElementsInRecord(record *flow
 	return nil
 }
 
+func copyStats(from, to *flowpb.Stats) {
+	to.PacketTotalCount = from.PacketTotalCount
+	to.PacketDeltaCount = from.PacketDeltaCount
+	to.OctetTotalCount = from.OctetTotalCount
+	to.OctetDeltaCount = from.OctetDeltaCount
+}
+
 func (a *aggregationProcess) addFieldsForStatsAggregation(record *flowpb.Flow, fillSrcStats, fillDstStats bool) {
 	record.Aggregation.StatsFromSource = &flowpb.Stats{}
 	record.Aggregation.ReverseStatsFromSource = &flowpb.Stats{}
 	record.Aggregation.StatsFromDestination = &flowpb.Stats{}
 	record.Aggregation.ReverseStatsFromDestination = &flowpb.Stats{}
-	copyStats := func(from, to *flowpb.Stats) {
-		to.PacketTotalCount = from.PacketTotalCount
-		to.PacketDeltaCount = from.PacketDeltaCount
-		to.OctetTotalCount = from.OctetTotalCount
-		to.OctetDeltaCount = from.OctetDeltaCount
-	}
 	if fillSrcStats {
 		copyStats(record.Stats, record.Aggregation.StatsFromSource)
 		copyStats(record.ReverseStats, record.Aggregation.ReverseStatsFromSource)
