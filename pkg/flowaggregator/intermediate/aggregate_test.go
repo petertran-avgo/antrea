@@ -556,17 +556,17 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 	})
 	t.Run("source node flow arrives first", func(t *testing.T) {
 		ap := newAggregationProcess()
-		fromGatewayRecord, flowKeyFromGateway := generateDestinationNodeFlowAndFlowKey()
-		fromOriginalSourceRecord, flowKeyfromOriginalSource := generateSourceNodeFlowAndFlowKey()
+		destinationNodeRecord, destinationNodeRecordFlowKey := generateDestinationNodeFlowAndFlowKey()
+		sourceNodeRecord, sourceNodeRecordFlowKey := generateSourceNodeFlowAndFlowKey()
 
-		ap.addOrUpdateRecordInMap(flowKeyfromOriginalSource, fromOriginalSourceRecord, false)
+		ap.addOrUpdateRecordInMap(sourceNodeRecordFlowKey, sourceNodeRecord, false)
 
 		assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
 		assertPriorityQueueRecordInitialized(t, ap)
 		recordForExport := ap.expirePriorityQueue.Peek().flowRecord
 		assert.False(t, recordForExport.ReadyToSend)
 
-		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
+		ap.addOrUpdateRecordInMap(destinationNodeRecordFlowKey, destinationNodeRecord, false)
 
 		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 		assertUpdated(t, recordForExport)
@@ -576,15 +576,15 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 	t.Run("destination node flow arrives first", func(t *testing.T) {
 		ap := newAggregationProcess()
 
-		fromGatewayRecord, flowKeyFromGateway := generateDestinationNodeFlowAndFlowKey()
-		fromOriginalSourceRecord, flowKeyfromOriginalSource := generateSourceNodeFlowAndFlowKey()
+		destinationNodeRecord, destinationNodeRecordFlowKey := generateDestinationNodeFlowAndFlowKey()
+		sourceNodeRecord, sourceNodeRecordFlowKey := generateSourceNodeFlowAndFlowKey()
 
-		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
-		assert.Nil(t, fromGatewayRecord.Aggregation)
+		ap.addOrUpdateRecordInMap(destinationNodeRecordFlowKey, destinationNodeRecord, false)
+		assert.Nil(t, sourceNodeRecord.Aggregation)
 		assert.Equal(t, 0, len(ap.expirePriorityQueue))
 		assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
 
-		ap.addOrUpdateRecordInMap(flowKeyfromOriginalSource, fromOriginalSourceRecord, false)
+		ap.addOrUpdateRecordInMap(sourceNodeRecordFlowKey, sourceNodeRecord, false)
 
 		assertPriorityQueueRecordInitialized(t, ap)
 		recordForExport := ap.expirePriorityQueue.Peek().flowRecord
@@ -594,19 +594,19 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 
 	t.Run("source node flow arrives multiple times", func(t *testing.T) {
 		ap := newAggregationProcess()
-		fromOriginalSourceRecord, flowKeyfromOriginalSource := generateSourceNodeFlowAndFlowKey()
+		sourceNodeRecord, sourceNodeRecordFlowKey := generateSourceNodeFlowAndFlowKey()
 
-		ap.addOrUpdateRecordInMap(flowKeyfromOriginalSource, fromOriginalSourceRecord, false)
+		ap.addOrUpdateRecordInMap(sourceNodeRecordFlowKey, sourceNodeRecord, false)
 		// Second add does not panic
-		ap.addOrUpdateRecordInMap(flowKeyfromOriginalSource, fromOriginalSourceRecord, false)
+		ap.addOrUpdateRecordInMap(sourceNodeRecordFlowKey, sourceNodeRecord, false)
 	})
 	t.Run("destionation node flow arrives multiple times", func(t *testing.T) {
 		ap := newAggregationProcess()
-		fromGatewayRecord, flowKeyFromGateway := generateDestinationNodeFlowAndFlowKey()
+		sourceNodeRecord, sourceNodeRecordFlowKey := generateSourceNodeFlowAndFlowKey()
 
-		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
+		ap.addOrUpdateRecordInMap(sourceNodeRecordFlowKey, sourceNodeRecord, false)
 		// Second add does not panic
-		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
+		ap.addOrUpdateRecordInMap(sourceNodeRecordFlowKey, sourceNodeRecord, false)
 	})
 }
 

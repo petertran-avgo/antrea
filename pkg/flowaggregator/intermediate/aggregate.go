@@ -437,7 +437,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				a.addFieldsForThroughputCalculation(record, record, true, false)
 				a.addFieldsForThroughputCalculation(stashedRecord, record, false, true)
 
-				copyStats(stash.DestinationNodeFlow.Record.Stats, record.Aggregation.StatsFromDestination)
+				copyStats(stashedRecord.Stats, record.Aggregation.StatsFromDestination)
 
 				heap.Push(&a.expirePriorityQueue, pqItem)
 			}
