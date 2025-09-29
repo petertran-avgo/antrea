@@ -513,6 +513,20 @@ func assertUncorrelatedStats(t *testing.T, flowRecord *AggregationFlowRecord) {
 	assert.Equal(t, throughPutFromOriginalSource, aggregation.ThroughputFromDestination)
 }
 
+func assertPriorityQueueRecordInitialized(t *testing.T, ap *aggregationProcess) {
+	assert.Equal(t, 1, len(ap.expirePriorityQueue))
+	recordForExport := ap.expirePriorityQueue.Peek().flowRecord
+	assert.NotNil(t, recordForExport)
+	assert.NotEmpty(t, ap.expirePriorityQueue.Peek().activeExpireTime)
+	assert.NotEmpty(t, ap.expirePriorityQueue.Peek().inactiveExpireTime)
+}
+
+func assertUpdated(t *testing.T, record *AggregationFlowRecord) {
+	assert.True(t, record.ReadyToSend)
+	assert.NotNil(t, record.Record.Aggregation)
+	assert.Equal(t, destinationPodName, record.Record.K8S.DestinationPodName)
+}
+
 // TestCorrelateRecordsForFromExternalFlow validates flows received by the FlowAggregator
 // are correctly correlated as they come from 2 zones with different information
 func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
@@ -534,37 +548,28 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		flowKey, _ := getFlowKeyFromRecord(record)
 
 		ap.addOrUpdateRecordInMap(flowKey, record, false)
-		assert.NotNil(t, record.Aggregation)
 
-		assert.Equal(t, 1, len(ap.expirePriorityQueue))
+		assertPriorityQueueRecordInitialized(t, ap)
 		recordForExport := ap.expirePriorityQueue.Peek().flowRecord
-		assert.NotNil(t, recordForExport)
-		assert.True(t, recordForExport.ReadyToSend)
-
+		assertUpdated(t, recordForExport)
 		assertUncorrelatedStats(t, recordForExport)
 	})
 	t.Run("fromOrignalSource arrives first", func(t *testing.T) {
 		ap := newAggregationProcess()
-
 		fromGatewayRecord, flowKeyFromGateway := generateFromGatewayFlowAndFlowKey()
 		fromOriginalSourceRecord, flowKeyfromOriginalSource := generateFromOriginalSourceFlowAndFlowKey()
 
 		ap.addOrUpdateRecordInMap(flowKeyfromOriginalSource, fromOriginalSourceRecord, false)
-		assert.NotNil(t, fromOriginalSourceRecord.Aggregation)
-		assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
 
-		assert.Equal(t, 1, len(ap.expirePriorityQueue))
+		assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
+		assertPriorityQueueRecordInitialized(t, ap)
 		recordForExport := ap.expirePriorityQueue.Peek().flowRecord
-		assert.NotNil(t, recordForExport)
-		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().activeExpireTime)
-		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().inactiveExpireTime)
 		assert.False(t, recordForExport.ReadyToSend)
 
 		ap.addOrUpdateRecordInMap(flowKeyFromGateway, fromGatewayRecord, false)
-		assert.Equal(t, destinationPodName, fromOriginalSourceRecord.K8S.DestinationPodName)
-		assert.Equal(t, 1, len(ap.expirePriorityQueue))
-		assert.True(t, recordForExport.ReadyToSend)
 
+		assert.Equal(t, 1, len(ap.expirePriorityQueue))
+		assertUpdated(t, recordForExport)
 		assertCorrelatedStats(t, recordForExport)
 	})
 
@@ -580,14 +585,10 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
 
 		ap.addOrUpdateRecordInMap(flowKeyfromOriginalSource, fromOriginalSourceRecord, false)
-		assert.Equal(t, destinationPodName, fromOriginalSourceRecord.K8S.DestinationPodName)
-		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 
+		assertPriorityQueueRecordInitialized(t, ap)
 		recordForExport := ap.expirePriorityQueue.Peek().flowRecord
-		assert.NotNil(t, recordForExport)
-		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().activeExpireTime)
-		assert.NotEmpty(t, ap.expirePriorityQueue.Peek().inactiveExpireTime)
-		assert.True(t, recordForExport.ReadyToSend)
+		assertUpdated(t, recordForExport)
 		assertCorrelatedStats(t, recordForExport)
 	})
 

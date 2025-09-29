@@ -396,6 +396,8 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 		pqItem.flowRecord = aggregationRecord
 		a.addFieldsForStatsAggregation(record, true, true)
 		a.addFieldsForThroughputCalculation(record, record, true, true)
+		pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
+		pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
 
 		heap.Push(&a.expirePriorityQueue, pqItem)
 		return
