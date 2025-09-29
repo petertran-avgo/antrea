@@ -362,10 +362,10 @@ func (a *aggregationProcess) IsAggregatedRecordIPv4(record AggregationFlowRecord
 	return record.isIPv4
 }
 
-// fromOriginalSource takes records with FlowType FromExternal and returns true
+// isSourceNodeRecord takes records with FlowType FromExternal and returns true
 // if the record is from the original source by means of inspecting the
 // destination pod information which cannot be populated for such records
-func fromOriginalSource(record *flowpb.Flow) bool {
+func isSourceNodeRecord(record *flowpb.Flow) bool {
 	return record.K8S.DestinationPodName == ""
 }
 
@@ -414,7 +414,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 	klog.InfoS("received FromExternal record", "record", record, "key", key)
 	if exists {
 		klog.InfoS("record exists in externalipport map", "record", record)
-		if fromOriginalSource(record) {
+		if isSourceNodeRecord(record) {
 			klog.InfoS("record is to Gateway", "record", record)
 			if stash.FromGateway != nil {
 				record.K8S.DestinationPodName = stash.FromGateway.Record.K8S.DestinationPodName
@@ -465,7 +465,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 		}
 	} else {
 		klog.InfoS("record does not exist in externalipport map ", "record", record)
-		if fromOriginalSource(record) {
+		if isSourceNodeRecord(record) {
 			klog.InfoS("record does not exist in externalipport map so adding it to the queue", "record", record)
 			pqItem := &ItemToExpire{
 				flowKey: flowKey,
