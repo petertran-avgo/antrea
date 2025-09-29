@@ -430,6 +430,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				}
 				record.Aggregation = &flowpb.Aggregation{}
 				pqItem.flowRecord = aggregationRecord
+				currTime := a.clock.Now()
 				pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
 				pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
 				a.addFieldsForStatsAggregation(record, true, false)
@@ -446,7 +447,6 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				aggregationRecord.Record.K8S.DestinationPodName = record.K8S.DestinationPodName
 				aggregationRecord.ReadyToSend = true
 				klog.InfoS("record exists, received DestinationNodeFlow record, filled it but didnt add it to queue", "record", record)
-				// Populate Destination Stats from stashed records
 				copyStats(record.Stats, aggregationRecord.Record.Aggregation.StatsFromDestination)
 				a.addFieldsForThroughputCalculation(record, aggregationRecord.Record, false, true)
 			}
