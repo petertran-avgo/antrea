@@ -871,7 +871,7 @@ func TestForAllExpiredFlowRecordsDo(t *testing.T) {
 			0,
 		},
 		{
-			"Expired flow is properly removed",
+			"Expired flow is properly removed from map",
 			[]*flowpb.Flow{fromExternalRecord},
 			0,
 			0,

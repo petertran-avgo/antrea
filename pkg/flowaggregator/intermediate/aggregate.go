@@ -165,13 +165,7 @@ func (a *aggregationProcess) deleteKeyFromMap(pqItem *ItemToExpire) error {
 }
 
 func (a *aggregationProcess) deleteFromIPPortMap(record *flowpb.Flow) error {
-	ipAddressAsString := func(bytes []byte) string {
-		if len(bytes) == 0 {
-			return ""
-		}
-		return net.IP(bytes).String()
-	}
-	key := ipAddressAsString(record.Ip.Destination) + strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
+	key := generateIPPortMapKey(record)
 	_, exists := a.FromExternalIPPortMap[key]
 	if !exists {
 		return fmt.Errorf("key %v is not present in the IPPortMap", key)
@@ -405,7 +399,22 @@ func correlationRequired(record *flowpb.Flow) bool {
 	return record.K8S.DestinationPodName == "" || record.K8S.DestinationServicePortName == ""
 }
 
+// Return a key unique to the given record composed of it's IP and destination port
+// to be used in FromExternalIPPortMap to correlate the sourceNode and destinationNode
+// records that make up a FromExternal flow
+func generateIPPortMapKey(record *flowpb.Flow) string {
+	ipAddressAsString := func(bytes []byte) string {
+		if len(bytes) == 0 {
+			return ""
+		}
+		return net.IP(bytes).String()
+	}
+	return ipAddressAsString(record.Ip.Destination) + strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
+
+}
+
 func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, record *flowpb.Flow) {
+	currTime := a.clock.Now()
 
 	if !correlationRequired(record) {
 		pqItem := &ItemToExpire{
@@ -429,13 +438,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 		return
 	}
 
-	ipAddressAsString := func(bytes []byte) string {
-		if len(bytes) == 0 {
-			return ""
-		}
-		return net.IP(bytes).String()
-	}
-	key := ipAddressAsString(record.Ip.Destination) + strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
+	key := generateIPPortMapKey(record)
 	stash, exists := a.FromExternalIPPortMap[key]
 	klog.InfoS("received FromExternal record", "record", record, "key", key)
 	if exists {
@@ -457,7 +460,6 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				}
 				record.Aggregation = &flowpb.Aggregation{}
 				pqItem.flowRecord = aggregationRecord
-				currTime := a.clock.Now()
 				pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
 				pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
 				a.addFieldsForStatsAggregation(record, true, false)
@@ -502,7 +504,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			a.addFieldsForThroughputCalculation(record, record, true, false)
 
 			heap.Push(&a.expirePriorityQueue, pqItem)
-			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{SourceNodeFlow: aggregationRecord} // TODO double check this is being deleted over time
+			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{SourceNodeFlow: aggregationRecord}
 		} else {
 			klog.InfoS("record s not to gateway so it's not added to the queue", "record", record)
 			aggregationRecord := &AggregationFlowRecord{
