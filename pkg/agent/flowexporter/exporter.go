@@ -427,6 +427,12 @@ func getServiceName(port uint16, services []*corev1.Service) (string, string) {
 // the service whos port matches the destination port. An error is returned and error
 // messages are logged if no match is found or errors occurred retrieving services
 func (exp *FlowExporter) FillServiceInfo(conn *connection.Connection) error {
+
+	klog.InfoS("Filling service info for connection", "connection", conn)
+	if conn.DestinationPodNamespace == "" {
+		klog.InfoS("Filling service info for connection, destination pod namespace empty", "connection", conn)
+	}
+
 	//TODO error check along the way
 	services, err := exp.serviceInformer.Lister().Services(conn.DestinationPodNamespace).List(labels.NewSelector())
 	if err != nil {
@@ -441,6 +447,7 @@ func (exp *FlowExporter) FillServiceInfo(conn *connection.Connection) error {
 		return errorMessage
 	}
 	conn.DestinationServicePortName = fmt.Sprintf("%s/%s:%s", conn.DestinationPodNamespace, matchingServiceName, portName)
+	klog.InfoS("Filling service info for connection, destination service port name populated with", "connection", conn, "destination serivce port name", conn.DestinationServicePortName)
 	return nil
 }
 
