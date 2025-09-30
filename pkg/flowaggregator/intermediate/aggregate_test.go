@@ -436,6 +436,7 @@ func generateSourceNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 	sourceNodeFlowKey, _ := getFlowKeyFromRecord(sourceNodeRecord)
 	return sourceNodeRecord, sourceNodeFlowKey
 }
+
 func generateDestinationNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 	destinationNodeRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
@@ -581,12 +582,12 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 
 		ap.addOrUpdateRecordInMap(destinationNodeRecordFlowKey, destinationNodeRecord, false)
 		assert.Nil(t, sourceNodeRecord.Aggregation)
-		assert.Equal(t, 0, len(ap.expirePriorityQueue))
+		assertPriorityQueueRecordInitialized(t, ap)
 		assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
+		ap.expirePriorityQueue.Pop()
 
 		ap.addOrUpdateRecordInMap(sourceNodeRecordFlowKey, sourceNodeRecord, false)
 
-		assertPriorityQueueRecordInitialized(t, ap)
 		recordForExport := ap.expirePriorityQueue.Peek().flowRecord
 		assertUpdated(t, recordForExport)
 		assertCorrelatedStats(t, recordForExport)
@@ -826,6 +827,7 @@ func TestForAllExpiredFlowRecordsDo(t *testing.T) {
 		return nil
 	}
 
+	fromExternalRecord, _ := generateDestinationNodeFlowAndFlowKey()
 	testCases := []struct {
 		name               string
 		records            []*flowpb.Flow
@@ -868,6 +870,12 @@ func TestForAllExpiredFlowRecordsDo(t *testing.T) {
 			0,
 			0,
 		},
+		{
+			"Expired flow is properly removed",
+			[]*flowpb.Flow{fromExternalRecord},
+			0,
+			0,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -899,6 +907,17 @@ func TestForAllExpiredFlowRecordsDo(t *testing.T) {
 					err := ap.ForAllExpiredFlowRecordsDo(testCallback)
 					assert.NoError(t, err)
 				}
+			case "Expired flow is properly removed from map":
+				assert.Equal(t, 1, len(ap.expirePriorityQueue))
+				for range 2 {
+					pqItem := ap.expirePriorityQueue.Peek()
+					pqItem.inactiveExpireTime = time.Time{}
+					err := ap.ForAllExpiredFlowRecordsDo(testCallback)
+					assert.NoError(t, err)
+				}
+
+				assert.Equal(t, 0, len(ap.FromExternalIPPortMap), "Expected record to be cleared from IP Port map after the record reaches max retries")
+
 			default:
 				break
 			}

@@ -155,6 +155,31 @@ func (a *aggregationProcess) ForAllRecordsDo(callback FlowKeyRecordMapCallBack) 
 	return nil
 }
 
+// Given a priority queue item, delete it's key references from
+// the corresponding map used for correlation
+func (a *aggregationProcess) deleteKeyFromMap(pqItem *ItemToExpire) error {
+	if pqItem.isFromExternal {
+		return a.deleteFromIPPortMap(pqItem.flowRecord.Record)
+	}
+	return a.deleteFlowKeyFromMapWithoutLock(*pqItem.flowKey)
+}
+
+func (a *aggregationProcess) deleteFromIPPortMap(record *flowpb.Flow) error {
+	ipAddressAsString := func(bytes []byte) string {
+		if len(bytes) == 0 {
+			return ""
+		}
+		return net.IP(bytes).String()
+	}
+	key := ipAddressAsString(record.Ip.Destination) + strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
+	_, exists := a.FromExternalIPPortMap[key]
+	if !exists {
+		return fmt.Errorf("key %v is not present in the IPPortMap", key)
+	}
+	delete(a.FromExternalIPPortMap, key)
+	return nil
+}
+
 func (a *aggregationProcess) deleteFlowKeyFromMap(flowKey FlowKey) error {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
@@ -306,7 +331,7 @@ func (a *aggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMa
 			pqItem.flowRecord.waitForReadyToSendRetries = pqItem.flowRecord.waitForReadyToSendRetries + 1
 			if pqItem.flowRecord.waitForReadyToSendRetries > MaxRetries {
 				klog.V(2).Infof("Deleting the record after waiting for ready to send with key: %v record: %v", pqItem.flowKey, pqItem.flowRecord)
-				if err := a.deleteFlowKeyFromMapWithoutLock(*pqItem.flowKey); err != nil {
+				if err := a.deleteKeyFromMap(pqItem); err != nil {
 					return fmt.Errorf("error while deleting flow record after max retries: %v", err)
 				}
 			} else {
@@ -324,7 +349,7 @@ func (a *aggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMa
 		}
 		// Delete the flow record if it is expired because of inactive expiry timeout.
 		if pqItem.inactiveExpireTime.Before(currTime) {
-			if err = a.deleteFlowKeyFromMapWithoutLock(*pqItem.flowKey); err != nil {
+			if err := a.deleteKeyFromMap(pqItem); err != nil {
 				return fmt.Errorf("error while deleting flow record after inactive expiry: %v", err)
 			}
 			continue
@@ -384,7 +409,8 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 
 	if !correlationRequired(record) {
 		pqItem := &ItemToExpire{
-			flowKey: flowKey,
+			flowKey:        flowKey,
+			isFromExternal: true,
 		}
 		aggregationRecord := &AggregationFlowRecord{
 			Record:                    record,
@@ -420,7 +446,8 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				stashedRecord := stash.DestinationNodeFlow.Record
 				record.K8S.DestinationPodName = stashedRecord.K8S.DestinationPodName
 				pqItem := &ItemToExpire{
-					flowKey: flowKey,
+					flowKey:        flowKey,
+					isFromExternal: true,
 				}
 				aggregationRecord := &AggregationFlowRecord{
 					Record:                    record,
@@ -456,7 +483,8 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 		if isSourceNodeRecord(record) {
 			klog.InfoS("record does not exist in externalipport map so adding it to the queue", "record", record)
 			pqItem := &ItemToExpire{
-				flowKey: flowKey,
+				flowKey:        flowKey,
+				isFromExternal: true,
 			}
 			record.Aggregation = &flowpb.Aggregation{}
 			aggregationRecord := &AggregationFlowRecord{
@@ -483,6 +511,16 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				waitForReadyToSendRetries: 0,
 				isIPv4:                    false,
 			}
+			pqItem := &ItemToExpire{
+				flowKey:        flowKey,
+				isFromExternal: true,
+			}
+			pqItem.flowRecord = aggregationRecord
+			currTime := a.clock.Now()
+			pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
+			pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
+			heap.Push(&a.expirePriorityQueue, pqItem)
+
 			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{DestinationNodeFlow: aggregationRecord}
 		}
 	}
