@@ -428,13 +428,13 @@ func getServiceName(port uint16, services []*corev1.Service) (string, string) {
 // messages are logged if no match is found or errors occurred retrieving services
 func (exp *FlowExporter) FillServiceInfo(conn *connection.Connection) error {
 
-	klog.InfoS("Filling service info for connection", "connection", conn)
 	if conn.DestinationPodNamespace == "" {
 		klog.InfoS("Filling service info for connection, destination pod namespace empty", "connection", conn)
 	}
 
 	//TODO error check along the way
 	services, err := exp.serviceInformer.Lister().Services(conn.DestinationPodNamespace).List(labels.NewSelector())
+	klog.InfoS("Filling service info for connection", "connection", conn, "services", services)
 	if err != nil {
 		errorMessage := fmt.Errorf("Failed to list services %w", err)
 		klog.ErrorS(errorMessage, "Failed to find service info for connection", "connection", conn)
