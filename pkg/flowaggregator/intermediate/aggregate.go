@@ -388,15 +388,18 @@ func isSourceNodeRecord(record *flowpb.Flow) bool {
 	return record.K8S.DestinationPodName == ""
 }
 
-// correlationRequired takes in records of flow type FromExternal and returns true if
+// fromExternalCorrelationRequired takes in records of flow type FromExternal and returns true if
 // colocation is not required because it is the case where the external call hits the node
 // that happens to have the pod serving the request. When this case happens,
 // both the destination pod name was
 // correlation is not required when
 // the destination pod name is non empty (because the exporter is able to fill this in due to being colocated with the target pod)
 // and the service port is discoverable (which isn't done when the record doesn't have the original source and destination port)
-func correlationRequired(record *flowpb.Flow) bool {
-	return record.K8S.DestinationPodName == "" || record.K8S.DestinationServicePortName == ""
+func fromExternalCorrelationRequired(record *flowpb.Flow) bool {
+	return record.K8S.DestinationServicePortName == "" ||
+		record.K8S.DestinationPodName == ""
+	// pulling destination service port name from the destinationRecord makes it complicated to identify the case where
+	// correlation is not required. i guess i could just look up if source ip is a gateway
 }
 
 // Return a key unique to the given record composed of it's IP and destination port
@@ -416,7 +419,8 @@ func generateIPPortMapKey(record *flowpb.Flow) string {
 func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, record *flowpb.Flow) {
 	currTime := a.clock.Now()
 
-	if !correlationRequired(record) {
+	if !fromExternalCorrelationRequired(record) {
+		fmt.Println("\n\n\n\nsecond?")
 		pqItem := &ItemToExpire{
 			flowKey:        flowKey,
 			isFromExternal: true,

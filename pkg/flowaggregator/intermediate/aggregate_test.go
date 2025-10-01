@@ -388,6 +388,7 @@ func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
 }
 
 var destinationPodName = "nginx-deployment-HASH"
+var destinationPodNamespace = "some-namespace"
 var destinationServicePortName = "namespace/service-name:portname"
 var sourceNodePackets = uint64(1005)
 var destinationNodePackets = uint64(999)
@@ -423,8 +424,8 @@ var sourceNodeStats = &flowpb.Stats{
 func generateSourceNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 	sourceNodeRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
-			DestinationServicePortName: destinationServicePortName,
 			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
+			DestinationServicePortName: destinationServicePortName,
 		},
 		Ip:           sourceNodeIP,
 		Transport:    sampleTransport,
@@ -440,8 +441,9 @@ func generateSourceNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 func generateDestinationNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 	destinationNodeRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
-			DestinationPodName: destinationPodName,
-			FlowType:           flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
+			DestinationPodName:      destinationPodName,
+			DestinationPodNamespace: destinationPodNamespace,
+			FlowType:                flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
 		},
 		Ip: &flowpb.IP{
 			Source:      []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
@@ -462,21 +464,42 @@ func generateDestinationNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 
 // TestCorrelationRequired validates the logic behind wether or not a FromExternal flow
 // can be exported right away or needs correlation
-func TestCorrelationRequired(t *testing.T) {
+func TestFromExternalCorrelationRequired(t *testing.T) {
 	t.Run("correlation is not required", func(t *testing.T) {
 		record := &flowpb.Flow{
 			K8S: &flowpb.Kubernetes{
 				DestinationPodName:         destinationPodName,
+				DestinationPodNamespace:    "something",
+				DestinationServicePortName: destinationServicePortName,
+				SourcePodNamespace:         "", //EMPTY
+				SourcePodName:              "", //EMPTY
+			},
+		}
+		assert.False(t, fromExternalCorrelationRequired(record))
+	})
+	t.Run("the flow is from the sourceNode", func(t *testing.T) {
+		record := &flowpb.Flow{
+			K8S: &flowpb.Kubernetes{
+				SourcePodNamespace:         "", //EMPTY
+				SourcePodName:              "", //EMPTY
+				DestinationPodName:         "", //EMPTY
+				DestinationPodNamespace:    "", //EMPTY
 				DestinationServicePortName: destinationServicePortName,
 			},
 		}
-		assert.False(t, correlationRequired(record))
+		assert.True(t, fromExternalCorrelationRequired(record))
 	})
-	t.Run("correlation is required", func(t *testing.T) {
+	t.Run("the flow is from the destinationNode", func(t *testing.T) {
 		record := &flowpb.Flow{
-			K8S: &flowpb.Kubernetes{},
+			K8S: &flowpb.Kubernetes{
+				SourcePodNamespace:         "", //EMPTY
+				SourcePodName:              "", //EMPTY
+				DestinationPodName:         "not empty",
+				DestinationPodNamespace:    "not empty",
+				DestinationServicePortName: "", //EMPTY
+			},
 		}
-		assert.True(t, correlationRequired(record))
+		assert.True(t, fromExternalCorrelationRequired(record))
 	})
 }
 
@@ -526,6 +549,7 @@ func assertUpdated(t *testing.T, record *AggregationFlowRecord) {
 	assert.True(t, record.ReadyToSend)
 	assert.NotNil(t, record.Record.Aggregation)
 	assert.Equal(t, destinationPodName, record.Record.K8S.DestinationPodName)
+	assert.Equal(t, destinationServicePortName, record.Record.K8S.DestinationServicePortName)
 }
 
 // TestCorrelateRecordsForFromExternalFlow validates flows received by the FlowAggregator
@@ -827,7 +851,7 @@ func TestForAllExpiredFlowRecordsDo(t *testing.T) {
 		return nil
 	}
 
-	fromExternalRecord, _ := generateDestinationNodeFlowAndFlowKey()
+	fromExternalRecord, _ := generateSourceNodeFlowAndFlowKey()
 	testCases := []struct {
 		name               string
 		records            []*flowpb.Flow
@@ -916,8 +940,8 @@ func TestForAllExpiredFlowRecordsDo(t *testing.T) {
 					assert.NoError(t, err)
 				}
 
-				assert.Equal(t, 0, len(ap.FromExternalIPPortMap), "Expected record to be cleared from IP Port map after the record reaches max retries")
-
+				assert.Equal(t, 0, len(ap.FromExternalIPPortMap),
+					"Expected record to be cleared from IP Port map after reaching max retries")
 			default:
 				break
 			}
