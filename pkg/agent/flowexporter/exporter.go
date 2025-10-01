@@ -443,7 +443,7 @@ func (exp *FlowExporter) FillServiceInfo(conn *connection.Connection) error {
 	matchingServiceName, portName := getServiceName(conn.OriginalDestinationPort, services)
 	if matchingServiceName == "" {
 		errorMessage := errors.New("No service with matching port found")
-		klog.ErrorS(errorMessage, "Failed to find service info for connection", "connection", conn)
+		klog.ErrorS(errorMessage, "Failed to find service info for connection", "connection", conn, "services", services)
 		return errorMessage
 	}
 	conn.DestinationServicePortName = fmt.Sprintf("%s/%s:%s", conn.DestinationPodNamespace, matchingServiceName, portName)
