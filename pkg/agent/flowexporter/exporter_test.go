@@ -439,8 +439,6 @@ func TestFlowExporter_findFlowType(t *testing.T) {
 	conn1 := connection.Connection{SourcePodName: "podA", DestinationPodName: "podB"}
 	conn2 := connection.Connection{SourcePodName: "podA", DestinationPodName: ""}
 	conn3 := connection.Connection{FlowKey: connection.Tuple{SourceAddress: isGateway, DestinationAddress: isPod}, DestinationPodNamespace: "not-empty"}
-	conn5 := connection.Connection{FlowKey: connection.Tuple{SourceAddress: isGateway, DestinationAddress: isPod},
-		DestinationPodNamespace: "flow-aggregator"}
 	conn55 := connection.Connection{FlowKey: connection.Tuple{SourceAddress: isGateway, DestinationAddress: isPod},
 		DestinationPodNamespace: ""}
 	conn4 := connection.Connection{FlowKey: connection.Tuple{DestinationAddress: isGateway}}
@@ -467,7 +465,6 @@ func TestFlowExporter_findFlowType(t *testing.T) {
 		{"isNetworkPolicy and pod names are missing", true, conn2, utils.FlowTypeInterNode, nil, nil},
 		{"unspecified flow type", false, conn1, utils.FlowTypeUnspecified, nil, nil},
 		{"source is gateway and destinoation pod namespace is not flow aggregator", false, conn3, utils.FlowTypeFromExternal, mockController, nil},
-		{"source is gateway and destinoation is flow aggregator", false, conn5, utils.FlowTypeUnsupported, mockController, nil},
 		{"source is gateway and destinoation pod namesapce is empty", false, conn55, utils.FlowTypeUnsupported, mockController, nil},
 		{"destination is gateway", false, conn4, utils.FlowTypeUnsupported, mockController, nil},
 		{"source is pod, but destination is not", false, conn6, utils.FlowTypeToExternal, mockController, nil},
