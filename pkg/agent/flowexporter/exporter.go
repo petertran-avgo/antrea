@@ -414,7 +414,7 @@ func (exp *FlowExporter) fillEgressInfo(conn *connection.Connection) {
 func getServiceName(port uint16, services []*corev1.Service) (string, string) {
 	for _, service := range services {
 		for _, servicePort := range service.Spec.Ports {
-			if servicePort.NodePort == int32(port) {
+			if servicePort.Port == int32(port) {
 				return service.Name, servicePort.Name
 			}
 		}
@@ -440,7 +440,7 @@ func (exp *FlowExporter) FillServiceInfo(conn *connection.Connection) error {
 		klog.ErrorS(errorMessage, "Failed to find service info for connection", "connection", conn)
 		return errorMessage
 	}
-	matchingServiceName, portName := getServiceName(conn.OriginalDestinationPort, services)
+	matchingServiceName, portName := getServiceName(conn.FlowKey.DestinationPort, services)
 	if matchingServiceName == "" {
 		errorMessage := errors.New("No service with matching port found")
 		klog.ErrorS(errorMessage, "Failed to find service info for connection", "connection", conn, "services", services)

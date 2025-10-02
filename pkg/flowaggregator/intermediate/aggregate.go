@@ -141,6 +141,7 @@ func (a *aggregationProcess) aggregateRecordByFlowKey(record *flowpb.Flow) error
 	return nil
 }
 
+// TODO - can this be deleted?
 // ForAllRecordsDo takes in callback function to process the operations to flowkey->records pairs in the map
 func (a *aggregationProcess) ForAllRecordsDo(callback FlowKeyRecordMapCallBack) error {
 	a.mutex.Lock()
@@ -396,6 +397,24 @@ func isSourceNodeRecord(record *flowpb.Flow) bool {
 // the destination pod name is non empty (because the exporter is able to fill this in due to being colocated with the target pod)
 // and the service port is discoverable (which isn't done when the record doesn't have the original source and destination port)
 func fromExternalCorrelationRequired(record *flowpb.Flow) bool {
+
+	ipAddressAsString := func(bytes []byte) string {
+		if len(bytes) == 0 {
+			return ""
+		}
+		return net.IP(bytes).String()
+	}
+	ip := net.ParseIP(ipAddressAsString(record.Ip.Source))
+	if ip == nil {
+		return false
+	}
+
+	if ipv4 := ip.To4(); ipv4 != nil {
+		if ipv4[0] == 10 {
+			return true
+		}
+	}
+
 	return record.K8S.DestinationServicePortName == "" ||
 		record.K8S.DestinationPodName == ""
 	// pulling destination service port name from the destinationRecord makes it complicated to identify the case where
@@ -406,6 +425,7 @@ func fromExternalCorrelationRequired(record *flowpb.Flow) bool {
 // to be used in FromExternalIPPortMap to correlate the sourceNode and destinationNode
 // records that make up a FromExternal flow
 func generateIPPortMapKey(record *flowpb.Flow) string {
+	// TODO make this a function (it's also pulled from somewhere else)
 	ipAddressAsString := func(bytes []byte) string {
 		if len(bytes) == 0 {
 			return ""

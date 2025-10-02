@@ -467,6 +467,9 @@ func generateDestinationNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 func TestFromExternalCorrelationRequired(t *testing.T) {
 	t.Run("correlation is not required", func(t *testing.T) {
 		record := &flowpb.Flow{
+			Ip: &flowpb.IP{
+				Source: []byte{0xac, 0x12, 0x00, 0x01}, // 172.12.18.01
+			},
 			K8S: &flowpb.Kubernetes{
 				DestinationPodName:         destinationPodName,
 				DestinationPodNamespace:    "something",
@@ -479,24 +482,44 @@ func TestFromExternalCorrelationRequired(t *testing.T) {
 	})
 	t.Run("the flow is from the sourceNode", func(t *testing.T) {
 		record := &flowpb.Flow{
+			Ip: &flowpb.IP{
+				Source: []byte{0xac, 0x12, 0x00, 0x01}, // 172.12.18.01
+			},
 			K8S: &flowpb.Kubernetes{
 				SourcePodNamespace:         "", //EMPTY
 				SourcePodName:              "", //EMPTY
 				DestinationPodName:         "", //EMPTY
 				DestinationPodNamespace:    "", //EMPTY
-				DestinationServicePortName: destinationServicePortName,
+				DestinationServicePortName: "incomplete serivce name",
 			},
 		}
 		assert.True(t, fromExternalCorrelationRequired(record))
 	})
 	t.Run("the flow is from the destinationNode", func(t *testing.T) {
 		record := &flowpb.Flow{
+			Ip: &flowpb.IP{
+				Source: []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
+			},
 			K8S: &flowpb.Kubernetes{
+
+				/*
+					{protocol_number:6 source_port:59885 destination_port:80 TCP:{state_name:\"TIME_WAIT\"}}
+					k8s:{flow_type:FLOW_TYPE_FROM_EXTERNAL
+					destination_pod_namespace:\"test\"
+					destination_pod_name:\"nginx-deployment-79c8dcc9c4-mrbn6\"
+					destination_pod_uid:\"989b60f0-2278-4d8f-8074-97cf5bdbcde8\"
+					destination_node_name:\"kind-worker\"
+					destination_node_uid:\"338fd5b1-08a3-440b-9236-f2aa4825d780\"
+					destination_cluster_ip:\"\\n\\xf4\\x01B\"
+					destination_service_port:80
+					destination_service_port_name:\"test/my-app:\"}
+					stats:{packet_total_count:7 packet_delta_count:7 octet_total_count:451 octet_delta_count:451} reverse_stats:{packet_total_count:5 packet_delta_count:5 octet_total_count:1118 octet_delta_count:1118}
+				*/
 				SourcePodNamespace:         "", //EMPTY
 				SourcePodName:              "", //EMPTY
 				DestinationPodName:         "not empty",
 				DestinationPodNamespace:    "not empty",
-				DestinationServicePortName: "", //EMPTY
+				DestinationServicePortName: destinationServicePortName,
 			},
 		}
 		assert.True(t, fromExternalCorrelationRequired(record))
