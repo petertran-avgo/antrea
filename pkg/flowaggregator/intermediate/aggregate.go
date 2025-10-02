@@ -452,7 +452,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 		}
 		record.Aggregation = &flowpb.Aggregation{}
 		pqItem.flowRecord = aggregationRecord
-		a.addFieldsForStatsAggregation(record, true, true)
+		a.addFieldsForStatsAggregation(record, record, true, true)
 		a.addFieldsForThroughputCalculation(record, record, true, true)
 		pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
 		pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
@@ -465,13 +465,19 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 	stash, exists := a.FromExternalIPPortMap[key]
 	klog.InfoS("received FromExternal record", "record", record, "key", key)
 	if exists {
-		klog.InfoS("record exists in externalipport map", "record", record)
 		if isSourceNodeRecord(record) {
-			klog.InfoS("record is to Gateway", "record", record)
 			if stash.DestinationNodeFlow != nil {
-				stashedRecord := stash.DestinationNodeFlow.Record
-				record.K8S.DestinationPodName = stashedRecord.K8S.DestinationPodName
-				record.K8S.DestinationServicePortName = stashedRecord.K8S.DestinationServicePortName
+				aggregationRecord := stash.DestinationNodeFlow
+				aggregationRecord.Record.Ip.Source = record.Ip.Source
+				aggregationRecord.ReadyToSend = true
+				copyStats(record.Stats, aggregationRecord.Record.Aggregation.StatsFromSource)
+				a.addFieldsForThroughputCalculation(record, aggregationRecord.Record, true, false)
+			}
+		} else {
+			if stash.SourceNodeFlow != nil {
+				stashedRecord := stash.SourceNodeFlow.Record
+
+				record.Ip.Source = stashedRecord.Ip.Source
 				pqItem := &ItemToExpire{
 					flowKey:        flowKey,
 					isFromExternal: true,
@@ -486,29 +492,37 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				pqItem.flowRecord = aggregationRecord
 				pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
 				pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
-				a.addFieldsForStatsAggregation(record, true, false)
-				a.addFieldsForThroughputCalculation(record, record, true, false)
-				a.addFieldsForThroughputCalculation(stashedRecord, record, false, true)
-
-				copyStats(stashedRecord.Stats, record.Aggregation.StatsFromDestination)
+				a.addFieldsForStatsAggregation(stashedRecord, record, true, false)
+				copyStats(record.Stats, record.Aggregation.StatsFromDestination)
+				a.addFieldsForThroughputCalculation(stashedRecord, record, true, false)
+				a.addFieldsForThroughputCalculation(record, record, false, true)
 
 				heap.Push(&a.expirePriorityQueue, pqItem)
 			}
-		} else {
-			if stash.SourceNodeFlow != nil {
-				aggregationRecord := stash.SourceNodeFlow
-				aggregationRecord.Record.K8S.DestinationPodName = record.K8S.DestinationPodName
-				aggregationRecord.Record.K8S.DestinationServicePortName = record.K8S.DestinationServicePortName
-				aggregationRecord.ReadyToSend = true
-				klog.InfoS("record exists, received DestinationNodeFlow record, filled it but didnt add it to queue", "record", record)
-				copyStats(record.Stats, aggregationRecord.Record.Aggregation.StatsFromDestination)
-				a.addFieldsForThroughputCalculation(record, aggregationRecord.Record, false, true)
-			}
 		}
 	} else {
-		klog.InfoS("record does not exist in externalipport map ", "record", record)
 		if isSourceNodeRecord(record) {
-			klog.InfoS("record does not exist in externalipport map so adding it to the queue", "record", record)
+			record.Aggregation = &flowpb.Aggregation{}
+			aggregationRecord := &AggregationFlowRecord{
+				Record:                    record,
+				ReadyToSend:               false,
+				waitForReadyToSendRetries: 0,
+				isIPv4:                    false,
+			}
+			pqItem := &ItemToExpire{
+				flowKey:        flowKey,
+				isFromExternal: true,
+			}
+			pqItem.flowRecord = aggregationRecord
+			currTime := a.clock.Now()
+			pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
+			pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
+			//a.addFieldsForStatsAggregation(record, true, false)
+			//a.addFieldsForThroughputCalculation(record, record, true, false)
+			heap.Push(&a.expirePriorityQueue, pqItem)
+
+			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{SourceNodeFlow: aggregationRecord}
+		} else {
 			pqItem := &ItemToExpire{
 				flowKey:        flowKey,
 				isFromExternal: true,
@@ -525,29 +539,10 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			pqItem.flowRecord = aggregationRecord
 			pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
 			pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
-			a.addFieldsForStatsAggregation(record, true, false)
-			a.addFieldsForThroughputCalculation(record, record, true, false)
+			a.addFieldsForStatsAggregation(record, record, false, true)
+			a.addFieldsForThroughputCalculation(record, record, false, true)
 
 			heap.Push(&a.expirePriorityQueue, pqItem)
-			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{SourceNodeFlow: aggregationRecord}
-		} else {
-			klog.InfoS("record s not to gateway so it's not added to the queue", "record", record)
-			aggregationRecord := &AggregationFlowRecord{
-				Record:                    record,
-				ReadyToSend:               false,
-				waitForReadyToSendRetries: 0,
-				isIPv4:                    false,
-			}
-			pqItem := &ItemToExpire{
-				flowKey:        flowKey,
-				isFromExternal: true,
-			}
-			pqItem.flowRecord = aggregationRecord
-			currTime := a.clock.Now()
-			pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
-			pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
-			heap.Push(&a.expirePriorityQueue, pqItem)
-
 			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{DestinationNodeFlow: aggregationRecord}
 		}
 	}
@@ -598,14 +593,14 @@ func (a *aggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record *fl
 		// Add all the new stat fields and initialize them.
 		if correlationRequired {
 			if isRecordFromSrc(record) {
-				a.addFieldsForStatsAggregation(record, true, false)
+				a.addFieldsForStatsAggregation(record, record, true, false)
 				a.addFieldsForThroughputCalculation(record, record, true, false)
 			} else {
-				a.addFieldsForStatsAggregation(record, false, true)
+				a.addFieldsForStatsAggregation(record, record, false, true)
 				a.addFieldsForThroughputCalculation(record, record, false, true)
 			}
 		} else {
-			a.addFieldsForStatsAggregation(record, true, true)
+			a.addFieldsForStatsAggregation(record, record, true, true) // TODO make a wrapper function for this case
 			a.addFieldsForThroughputCalculation(record, record, true, true)
 		}
 		aggregationRecord = &AggregationFlowRecord{
@@ -873,19 +868,19 @@ func copyStats(from, to *flowpb.Stats) {
 	to.OctetDeltaCount = from.OctetDeltaCount
 }
 
-func (a *aggregationProcess) addFieldsForStatsAggregation(record *flowpb.Flow, fillSrcStats, fillDstStats bool) {
-	record.Aggregation.StatsFromSource = &flowpb.Stats{}
-	record.Aggregation.ReverseStatsFromSource = &flowpb.Stats{}
-	record.Aggregation.StatsFromDestination = &flowpb.Stats{}
-	record.Aggregation.ReverseStatsFromDestination = &flowpb.Stats{}
+func (a *aggregationProcess) addFieldsForStatsAggregation(from, to *flowpb.Flow, fillSrcStats, fillDstStats bool) {
+	to.Aggregation.StatsFromSource = &flowpb.Stats{}
+	to.Aggregation.ReverseStatsFromSource = &flowpb.Stats{}
+	to.Aggregation.StatsFromDestination = &flowpb.Stats{}
+	to.Aggregation.ReverseStatsFromDestination = &flowpb.Stats{}
 	if fillSrcStats {
-		copyStats(record.Stats, record.Aggregation.StatsFromSource)
-		copyStats(record.ReverseStats, record.Aggregation.ReverseStatsFromSource)
+		copyStats(from.Stats, to.Aggregation.StatsFromSource)
+		copyStats(from.ReverseStats, to.Aggregation.ReverseStatsFromSource)
 	}
 
 	if fillDstStats {
-		copyStats(record.Stats, record.Aggregation.StatsFromDestination)
-		copyStats(record.ReverseStats, record.Aggregation.ReverseStatsFromDestination)
+		copyStats(from.Stats, to.Aggregation.StatsFromDestination)
+		copyStats(from.ReverseStats, to.Aggregation.ReverseStatsFromDestination)
 	}
 }
 
