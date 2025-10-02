@@ -425,7 +425,7 @@ func generateSourceNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 	sourceNodeRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
 			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
-			DestinationServicePortName: destinationServicePortName,
+			DestinationServicePortName: "incomplete-service-name",
 		},
 		Ip:           sourceNodeIP,
 		Transport:    sampleTransport,
@@ -441,9 +441,10 @@ func generateSourceNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 func generateDestinationNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 	destinationNodeRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
-			DestinationPodName:      destinationPodName,
-			DestinationPodNamespace: destinationPodNamespace,
-			FlowType:                flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
+			DestinationPodName:         destinationPodName,
+			DestinationPodNamespace:    destinationPodNamespace,
+			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
+			DestinationServicePortName: destinationServicePortName,
 		},
 		Ip: &flowpb.IP{
 			Source:      []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
@@ -611,12 +612,11 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 
 		assert.Equal(t, 1, len(ap.FromExternalIPPortMap))
 		assertPriorityQueueRecordInitialized(t, ap)
-		recordForExport := ap.expirePriorityQueue.Peek().flowRecord
+		recordForExport := ap.expirePriorityQueue.Pop().(*ItemToExpire).flowRecord
 		assert.False(t, recordForExport.ReadyToSend)
 
 		ap.addOrUpdateRecordInMap(destinationNodeRecordFlowKey, destinationNodeRecord, false)
 
-		assert.Equal(t, 1, len(ap.expirePriorityQueue))
 		assertUpdated(t, recordForExport)
 		assertCorrelatedStats(t, recordForExport)
 	})

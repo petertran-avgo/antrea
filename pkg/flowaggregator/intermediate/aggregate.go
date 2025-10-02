@@ -440,7 +440,6 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 	currTime := a.clock.Now()
 
 	if !fromExternalCorrelationRequired(record) {
-		fmt.Println("\n\n\n\nsecond?")
 		pqItem := &ItemToExpire{
 			flowKey:        flowKey,
 			isFromExternal: true,
@@ -472,6 +471,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			if stash.DestinationNodeFlow != nil {
 				stashedRecord := stash.DestinationNodeFlow.Record
 				record.K8S.DestinationPodName = stashedRecord.K8S.DestinationPodName
+				record.K8S.DestinationServicePortName = stashedRecord.K8S.DestinationServicePortName
 				pqItem := &ItemToExpire{
 					flowKey:        flowKey,
 					isFromExternal: true,
@@ -498,6 +498,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			if stash.SourceNodeFlow != nil {
 				aggregationRecord := stash.SourceNodeFlow
 				aggregationRecord.Record.K8S.DestinationPodName = record.K8S.DestinationPodName
+				aggregationRecord.Record.K8S.DestinationServicePortName = record.K8S.DestinationServicePortName
 				aggregationRecord.ReadyToSend = true
 				klog.InfoS("record exists, received DestinationNodeFlow record, filled it but didnt add it to queue", "record", record)
 				copyStats(record.Stats, aggregationRecord.Record.Aggregation.StatsFromDestination)
