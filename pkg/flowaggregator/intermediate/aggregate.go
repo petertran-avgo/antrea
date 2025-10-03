@@ -430,67 +430,30 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 	currTime := a.clock.Now()
 
 	if !fromExternalCorrelationRequired(record) {
-		pqItem := &ItemToExpire{
-			flowKey:        flowKey,
-			isFromExternal: true,
-		}
+		record.Aggregation = &flowpb.Aggregation{}
+		a.addFieldsForStatsAggregation(record, record, true, true)
+		a.addFieldsForThroughputCalculation(record, record, true, true)
 		aggregationRecord := &AggregationFlowRecord{
 			Record:                    record,
 			ReadyToSend:               true,
 			waitForReadyToSendRetries: 0,
 			isIPv4:                    isIPv4,
 		}
-		record.Aggregation = &flowpb.Aggregation{}
-		pqItem.flowRecord = aggregationRecord
-		a.addFieldsForStatsAggregation(record, record, true, true)
-		a.addFieldsForThroughputCalculation(record, record, true, true)
-		pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
-		pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
 
+		pqItem := &ItemToExpire{
+			flowKey:            flowKey,
+			isFromExternal:     true,
+			activeExpireTime:   currTime.Add(a.activeExpiryTimeout),
+			inactiveExpireTime: currTime.Add(a.inactiveExpiryTimeout),
+			flowRecord:         aggregationRecord,
+		}
 		heap.Push(&a.expirePriorityQueue, pqItem)
 		return
 	}
 
 	key := generateIPPortMapKey(record)
 	stash, exists := a.FromExternalIPPortMap[key]
-	klog.InfoS("received FromExternal record", "record", record, "key", key)
-	if exists {
-		if isSourceNodeRecord(record) {
-			if stash.DestinationNodeFlow != nil {
-				aggregationRecord := stash.DestinationNodeFlow
-				aggregationRecord.Record.Ip.Source = record.Ip.Source
-				aggregationRecord.ReadyToSend = true
-				copyStats(record.Stats, aggregationRecord.Record.Aggregation.StatsFromSource)
-				a.addFieldsForThroughputCalculation(record, aggregationRecord.Record, true, false)
-			}
-		} else {
-			if stash.SourceNodeFlow != nil {
-				stashedRecord := stash.SourceNodeFlow.Record
-
-				record.Ip.Source = stashedRecord.Ip.Source
-				pqItem := &ItemToExpire{
-					flowKey:        flowKey,
-					isFromExternal: true,
-				}
-				aggregationRecord := &AggregationFlowRecord{
-					Record:                    record,
-					ReadyToSend:               true,
-					waitForReadyToSendRetries: 0,
-					isIPv4:                    isIPv4,
-				}
-				record.Aggregation = &flowpb.Aggregation{}
-				pqItem.flowRecord = aggregationRecord
-				pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
-				pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
-				a.addFieldsForStatsAggregation(stashedRecord, record, true, false)
-				copyStats(record.Stats, record.Aggregation.StatsFromDestination)
-				a.addFieldsForThroughputCalculation(stashedRecord, record, true, false)
-				a.addFieldsForThroughputCalculation(record, record, false, true)
-
-				heap.Push(&a.expirePriorityQueue, pqItem)
-			}
-		}
-	} else {
+	if !exists {
 		if isSourceNodeRecord(record) {
 			record.Aggregation = &flowpb.Aggregation{}
 			aggregationRecord := &AggregationFlowRecord{
@@ -500,39 +463,73 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				isIPv4:                    isIPv4,
 			}
 			pqItem := &ItemToExpire{
-				flowKey:        flowKey,
-				isFromExternal: true,
+				flowKey:            flowKey,
+				isFromExternal:     true,
+				activeExpireTime:   currTime.Add(a.activeExpiryTimeout),
+				inactiveExpireTime: currTime.Add(a.inactiveExpiryTimeout),
+				flowRecord:         aggregationRecord,
 			}
-			pqItem.flowRecord = aggregationRecord
-			currTime := a.clock.Now()
-			pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
-			pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
 			heap.Push(&a.expirePriorityQueue, pqItem)
 
 			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{SourceNodeFlow: aggregationRecord}
-		} else {
-			pqItem := &ItemToExpire{
-				flowKey:        flowKey,
-				isFromExternal: true,
-			}
-			record.Aggregation = &flowpb.Aggregation{}
-			aggregationRecord := &AggregationFlowRecord{
-				Record:                    record,
-				ReadyToSend:               false,
-				waitForReadyToSendRetries: 0,
-				isIPv4:                    false,
-			}
-
-			currTime := a.clock.Now()
-			pqItem.flowRecord = aggregationRecord
-			pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
-			pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
-			a.addFieldsForStatsAggregation(record, record, false, true)
-			a.addFieldsForThroughputCalculation(record, record, false, true)
-
-			heap.Push(&a.expirePriorityQueue, pqItem)
-			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{DestinationNodeFlow: aggregationRecord}
+			return
 		}
+
+		record.Aggregation = &flowpb.Aggregation{}
+		a.addFieldsForStatsAggregation(record, record, false, true)
+		a.addFieldsForThroughputCalculation(record, record, false, true)
+		aggregationRecord := &AggregationFlowRecord{
+			Record:                    record,
+			ReadyToSend:               false,
+			waitForReadyToSendRetries: 0,
+			isIPv4:                    isIPv4,
+		}
+		pqItem := &ItemToExpire{
+			flowKey:            flowKey,
+			isFromExternal:     true,
+			activeExpireTime:   currTime.Add(a.activeExpiryTimeout),
+			inactiveExpireTime: currTime.Add(a.inactiveExpiryTimeout),
+			flowRecord:         aggregationRecord,
+		}
+
+		heap.Push(&a.expirePriorityQueue, pqItem)
+		a.FromExternalIPPortMap[key] = &FromExternalFlowStash{DestinationNodeFlow: aggregationRecord}
+		return
+	}
+
+	if isSourceNodeRecord(record) {
+		if stash.DestinationNodeFlow != nil {
+			aggregationRecord := stash.DestinationNodeFlow
+			aggregationRecord.Record.Ip.Source = record.Ip.Source
+			aggregationRecord.ReadyToSend = true
+			copyStats(record.Stats, aggregationRecord.Record.Aggregation.StatsFromSource)
+			a.addFieldsForThroughputCalculation(record, aggregationRecord.Record, true, false)
+		}
+		return
+	}
+
+	if stash.SourceNodeFlow != nil {
+		stashedRecord := stash.SourceNodeFlow.Record
+		record.Ip.Source = stashedRecord.Ip.Source
+		record.Aggregation = &flowpb.Aggregation{}
+		a.addFieldsForStatsAggregation(stashedRecord, record, true, false)
+		copyStats(record.Stats, record.Aggregation.StatsFromDestination)
+		a.addFieldsForThroughputCalculation(stashedRecord, record, true, false)
+		a.addFieldsForThroughputCalculation(record, record, false, true)
+		aggregationRecord := &AggregationFlowRecord{
+			Record:                    record,
+			ReadyToSend:               true,
+			waitForReadyToSendRetries: 0,
+			isIPv4:                    isIPv4,
+		}
+		pqItem := &ItemToExpire{
+			flowKey:            flowKey,
+			isFromExternal:     true,
+			flowRecord:         aggregationRecord,
+			activeExpireTime:   currTime.Add(a.activeExpiryTimeout),
+			inactiveExpireTime: currTime.Add(a.inactiveExpiryTimeout),
+		}
+		heap.Push(&a.expirePriorityQueue, pqItem)
 	}
 }
 
