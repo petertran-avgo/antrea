@@ -28,6 +28,7 @@ import (
 	"k8s.io/utils/clock"
 
 	flowpb "antrea.io/antrea/pkg/apis/flow/v1alpha1"
+	"antrea.io/antrea/pkg/flowaggregator/flowrecord"
 )
 
 var (
@@ -391,13 +392,7 @@ func isSourceNodeRecord(record *flowpb.Flow) bool {
 
 // isSourcePrivate turns true if the source IP address is private
 func isSourcePrivate(record *flowpb.Flow) bool {
-	ipAddressAsString := func(bytes []byte) string {
-		if len(bytes) == 0 {
-			return ""
-		}
-		return net.IP(bytes).String()
-	}
-	ip := net.ParseIP(ipAddressAsString(record.Ip.Source))
+	ip := net.ParseIP(flowrecord.IpAddressAsString(record.Ip.Source))
 	if ip == nil {
 		return false
 	}
@@ -427,14 +422,7 @@ func fromExternalCorrelationRequired(record *flowpb.Flow) bool {
 // to be used in FromExternalIPPortMap to correlate the sourceNode and destinationNode
 // records that make up a FromExternal flow
 func generateIPPortMapKey(record *flowpb.Flow) string {
-	// TODO make this a function (it's also pulled from somewhere else)
-	ipAddressAsString := func(bytes []byte) string {
-		if len(bytes) == 0 {
-			return ""
-		}
-		return net.IP(bytes).String()
-	}
-	return ipAddressAsString(record.Ip.Destination) + strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
+	return flowrecord.IpAddressAsString(record.Ip.Destination) + strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
 
 }
 
