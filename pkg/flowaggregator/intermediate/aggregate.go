@@ -389,15 +389,8 @@ func isSourceNodeRecord(record *flowpb.Flow) bool {
 	return record.K8S.DestinationPodName == ""
 }
 
-// fromExternalCorrelationRequired takes in records of flow type FromExternal and returns true if
-// colocation is not required because it is the case where the external call hits the node
-// that happens to have the pod serving the request. When this case happens,
-// both the destination pod name was
-// correlation is not required when
-// the destination pod name is non empty (because the exporter is able to fill this in due to being colocated with the target pod)
-// and the service port is discoverable (which isn't done when the record doesn't have the original source and destination port)
-func fromExternalCorrelationRequired(record *flowpb.Flow) bool {
-
+// isSourcePrivate turns true if the source IP address is private
+func isSourcePrivate(record *flowpb.Flow) bool {
 	ipAddressAsString := func(bytes []byte) string {
 		if len(bytes) == 0 {
 			return ""
@@ -409,16 +402,25 @@ func fromExternalCorrelationRequired(record *flowpb.Flow) bool {
 		return false
 	}
 
-	if ipv4 := ip.To4(); ipv4 != nil {
-		if ipv4[0] == 10 {
+	if ip4 := ip.To4(); ip4 != nil {
+		if ip4[0] == 10 {
 			return true
 		}
 	}
 
+	if ip6 := ip.To16(); ip6 != nil {
+		return ip6[0] == 0xfd
+	}
+	return false
+}
+
+func fromExternalCorrelationRequired(record *flowpb.Flow) bool {
+	if isSourcePrivate(record) {
+		return true
+	}
+
 	return record.K8S.DestinationServicePortName == "" ||
 		record.K8S.DestinationPodName == ""
-	// pulling destination service port name from the destinationRecord makes it complicated to identify the case where
-	// correlation is not required. i guess i could just look up if source ip is a gateway
 }
 
 // Return a key unique to the given record composed of it's IP and destination port
