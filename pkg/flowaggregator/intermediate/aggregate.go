@@ -390,8 +390,9 @@ func isSourceNodeRecord(record *flowpb.Flow) bool {
 	return record.K8S.DestinationPodName == ""
 }
 
-// isSourcePrivate turns true if the source IP address is private
-func isSourcePrivate(record *flowpb.Flow) bool {
+// isSourceInternal turns true if the source IP address is on the
+// internal network for either IPv4 or IPv6 addresses
+func isSourceInternal(record *flowpb.Flow) bool {
 	ip := net.ParseIP(flowrecord.IpAddressAsString(record.Ip.Source))
 	if ip == nil {
 		return false
@@ -410,7 +411,7 @@ func isSourcePrivate(record *flowpb.Flow) bool {
 }
 
 func fromExternalCorrelationRequired(record *flowpb.Flow) bool {
-	if isSourcePrivate(record) {
+	if isSourceInternal(record) {
 		return true
 	}
 
@@ -423,19 +424,14 @@ func fromExternalCorrelationRequired(record *flowpb.Flow) bool {
 // records that make up a FromExternal flow
 func generateIPPortMapKey(record *flowpb.Flow) string {
 	return flowrecord.IpAddressAsString(record.Ip.Destination) + strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
-
 }
 
 func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, record *flowpb.Flow, isIPv4 bool) {
 	currTime := a.clock.Now()
-
-	if !fromExternalCorrelationRequired(record) {
-		record.Aggregation = &flowpb.Aggregation{}
-		a.addFieldsForStatsAggregation(record, record, true, true)
-		a.addFieldsForThroughputCalculation(record, record, true, true)
+	addToQueue := func(readyToSend bool) *AggregationFlowRecord {
 		aggregationRecord := &AggregationFlowRecord{
 			Record:                    record,
-			ReadyToSend:               true,
+			ReadyToSend:               readyToSend,
 			waitForReadyToSendRetries: 0,
 			isIPv4:                    isIPv4,
 		}
@@ -448,56 +444,37 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			flowRecord:         aggregationRecord,
 		}
 		heap.Push(&a.expirePriorityQueue, pqItem)
+		return aggregationRecord
+	}
+
+	fillStatsAndPushToQueue := func() {
+		record.Aggregation = &flowpb.Aggregation{}
+		a.addFieldsForStatsAggregation(record, record, true, true)
+		a.addFieldsForThroughputCalculation(record, record, true, true)
+		addToQueue(true)
+	}
+	if !fromExternalCorrelationRequired(record) {
+		fillStatsAndPushToQueue()
 		return
 	}
 
 	key := generateIPPortMapKey(record)
 	stash, exists := a.FromExternalIPPortMap[key]
-	if !exists {
-		if isSourceNodeRecord(record) {
-			record.Aggregation = &flowpb.Aggregation{}
-			aggregationRecord := &AggregationFlowRecord{
-				Record:                    record,
-				ReadyToSend:               false,
-				waitForReadyToSendRetries: 0,
-				isIPv4:                    isIPv4,
-			}
-			pqItem := &ItemToExpire{
-				flowKey:            flowKey,
-				isFromExternal:     true,
-				activeExpireTime:   currTime.Add(a.activeExpiryTimeout),
-				inactiveExpireTime: currTime.Add(a.inactiveExpiryTimeout),
-				flowRecord:         aggregationRecord,
-			}
-			heap.Push(&a.expirePriorityQueue, pqItem)
 
-			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{SourceNodeFlow: aggregationRecord}
-			return
-		}
+	stashSourceNodeRecord := func() {
+		record.Aggregation = &flowpb.Aggregation{}
+		aggregationRecord := addToQueue(false)
 
+		a.FromExternalIPPortMap[key] = &FromExternalFlowStash{SourceNodeFlow: aggregationRecord}
+	}
+	stashDestinationNodeRecordWithStats := func() {
 		record.Aggregation = &flowpb.Aggregation{}
 		a.addFieldsForStatsAggregation(record, record, false, true)
 		a.addFieldsForThroughputCalculation(record, record, false, true)
-		aggregationRecord := &AggregationFlowRecord{
-			Record:                    record,
-			ReadyToSend:               false,
-			waitForReadyToSendRetries: 0,
-			isIPv4:                    isIPv4,
-		}
-		pqItem := &ItemToExpire{
-			flowKey:            flowKey,
-			isFromExternal:     true,
-			activeExpireTime:   currTime.Add(a.activeExpiryTimeout),
-			inactiveExpireTime: currTime.Add(a.inactiveExpiryTimeout),
-			flowRecord:         aggregationRecord,
-		}
-
-		heap.Push(&a.expirePriorityQueue, pqItem)
+		aggregationRecord := addToQueue(false)
 		a.FromExternalIPPortMap[key] = &FromExternalFlowStash{DestinationNodeFlow: aggregationRecord}
-		return
 	}
-
-	if isSourceNodeRecord(record) {
+	correlateDestinationNodeRecord := func() {
 		if stash.DestinationNodeFlow != nil {
 			aggregationRecord := stash.DestinationNodeFlow
 			aggregationRecord.Record.Ip.Source = record.Ip.Source
@@ -505,31 +482,32 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			copyStats(record.Stats, aggregationRecord.Record.Aggregation.StatsFromSource)
 			a.addFieldsForThroughputCalculation(record, aggregationRecord.Record, true, false)
 		}
-		return
+	}
+	correlateRecordWithStats := func() {
+		if stash.SourceNodeFlow != nil {
+			stashedRecord := stash.SourceNodeFlow.Record
+			record.Ip.Source = stashedRecord.Ip.Source
+			record.Aggregation = &flowpb.Aggregation{}
+			a.addFieldsForStatsAggregation(stashedRecord, record, true, false)
+			copyStats(record.Stats, record.Aggregation.StatsFromDestination)
+			a.addFieldsForThroughputCalculation(stashedRecord, record, true, false)
+			a.addFieldsForThroughputCalculation(record, record, false, true)
+			addToQueue(true)
+		}
 	}
 
-	if stash.SourceNodeFlow != nil {
-		stashedRecord := stash.SourceNodeFlow.Record
-		record.Ip.Source = stashedRecord.Ip.Source
-		record.Aggregation = &flowpb.Aggregation{}
-		a.addFieldsForStatsAggregation(stashedRecord, record, true, false)
-		copyStats(record.Stats, record.Aggregation.StatsFromDestination)
-		a.addFieldsForThroughputCalculation(stashedRecord, record, true, false)
-		a.addFieldsForThroughputCalculation(record, record, false, true)
-		aggregationRecord := &AggregationFlowRecord{
-			Record:                    record,
-			ReadyToSend:               true,
-			waitForReadyToSendRetries: 0,
-			isIPv4:                    isIPv4,
+	if !exists {
+		if isSourceNodeRecord(record) {
+			stashSourceNodeRecord()
+		} else {
+			stashDestinationNodeRecordWithStats()
 		}
-		pqItem := &ItemToExpire{
-			flowKey:            flowKey,
-			isFromExternal:     true,
-			flowRecord:         aggregationRecord,
-			activeExpireTime:   currTime.Add(a.activeExpiryTimeout),
-			inactiveExpireTime: currTime.Add(a.inactiveExpiryTimeout),
+	} else {
+		if isSourceNodeRecord(record) {
+			correlateDestinationNodeRecord()
+		} else {
+			correlateRecordWithStats()
 		}
-		heap.Push(&a.expirePriorityQueue, pqItem)
 	}
 }
 
