@@ -436,7 +436,7 @@ func generateIPPortMapKey(record *flowpb.Flow) string {
 
 }
 
-func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, record *flowpb.Flow) {
+func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, record *flowpb.Flow, isIPv4 bool) {
 	currTime := a.clock.Now()
 
 	if !fromExternalCorrelationRequired(record) {
@@ -448,7 +448,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			Record:                    record,
 			ReadyToSend:               true,
 			waitForReadyToSendRetries: 0,
-			isIPv4:                    false,
+			isIPv4:                    isIPv4,
 		}
 		record.Aggregation = &flowpb.Aggregation{}
 		pqItem.flowRecord = aggregationRecord
@@ -486,7 +486,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 					Record:                    record,
 					ReadyToSend:               true,
 					waitForReadyToSendRetries: 0,
-					isIPv4:                    false,
+					isIPv4:                    isIPv4,
 				}
 				record.Aggregation = &flowpb.Aggregation{}
 				pqItem.flowRecord = aggregationRecord
@@ -507,7 +507,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 				Record:                    record,
 				ReadyToSend:               false,
 				waitForReadyToSendRetries: 0,
-				isIPv4:                    false,
+				isIPv4:                    isIPv4,
 			}
 			pqItem := &ItemToExpire{
 				flowKey:        flowKey,
@@ -517,8 +517,6 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			currTime := a.clock.Now()
 			pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
 			pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
-			//a.addFieldsForStatsAggregation(record, true, false)
-			//a.addFieldsForThroughputCalculation(record, record, true, false)
 			heap.Push(&a.expirePriorityQueue, pqItem)
 
 			a.FromExternalIPPortMap[key] = &FromExternalFlowStash{SourceNodeFlow: aggregationRecord}
@@ -555,7 +553,7 @@ func (a *aggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record *fl
 	defer a.mutex.Unlock()
 
 	if record.K8S.FlowType == flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL {
-		a.addOrUpdateFromExternalRecord(flowKey, record)
+		a.addOrUpdateFromExternalRecord(flowKey, record, isIPv4)
 		return
 	}
 
