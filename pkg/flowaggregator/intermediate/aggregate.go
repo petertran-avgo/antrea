@@ -142,21 +142,6 @@ func (a *aggregationProcess) aggregateRecordByFlowKey(record *flowpb.Flow) error
 	return nil
 }
 
-// TODO - can this be deleted?
-// ForAllRecordsDo takes in callback function to process the operations to flowkey->records pairs in the map
-func (a *aggregationProcess) ForAllRecordsDo(callback FlowKeyRecordMapCallBack) error {
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
-	for k, v := range a.flowKeyRecordMap {
-		err := callback(k, v)
-		if err != nil {
-			klog.Errorf("Callback execution failed for flow with key: %v, records: %v, error: %v", k, v, err)
-			return err
-		}
-	}
-	return nil
-}
-
 // Given a priority queue item, delete it's key references from
 // the corresponding map used for correlation
 func (a *aggregationProcess) deleteKeyFromMap(pqItem *ItemToExpire) error {
@@ -426,6 +411,8 @@ func generateIPPortMapKey(record *flowpb.Flow) string {
 	return flowrecord.IpAddressAsString(record.Ip.Destination) + strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
 }
 
+// Given a record with flowtype FromExternal, adds it to the prioirty queue with corresponding stats filled.
+// If correlation is required the record is populated with the right stats and the external source IP.
 func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, record *flowpb.Flow, isIPv4 bool) {
 	currTime := a.clock.Now()
 	addToQueue := func(readyToSend bool) *AggregationFlowRecord {
@@ -449,7 +436,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 
 	fillStatsAndPushToQueue := func() {
 		record.Aggregation = &flowpb.Aggregation{}
-		a.addFieldsForStatsAggregation(record, record, true, true)
+		addFieldsForStatsAggregation(record, true, true)
 		a.addFieldsForThroughputCalculation(record, record, true, true)
 		addToQueue(true)
 	}
@@ -469,7 +456,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 	}
 	stashDestinationNodeRecordWithStats := func() {
 		record.Aggregation = &flowpb.Aggregation{}
-		a.addFieldsForStatsAggregation(record, record, false, true)
+		addFieldsForStatsAggregation(record, false, true)
 		a.addFieldsForThroughputCalculation(record, record, false, true)
 		aggregationRecord := addToQueue(false)
 		a.FromExternalIPPortMap[key] = &FromExternalFlowStash{DestinationNodeFlow: aggregationRecord}
@@ -488,7 +475,7 @@ func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, rec
 			stashedRecord := stash.SourceNodeFlow.Record
 			record.Ip.Source = stashedRecord.Ip.Source
 			record.Aggregation = &flowpb.Aggregation{}
-			a.addFieldsForStatsAggregation(stashedRecord, record, true, false)
+			copyFieldsForStatsAggregation(stashedRecord, record, true, false)
 			copyStats(record.Stats, record.Aggregation.StatsFromDestination)
 			a.addFieldsForThroughputCalculation(stashedRecord, record, true, false)
 			a.addFieldsForThroughputCalculation(record, record, false, true)
@@ -556,14 +543,14 @@ func (a *aggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record *fl
 		// Add all the new stat fields and initialize them.
 		if correlationRequired {
 			if isRecordFromSrc(record) {
-				a.addFieldsForStatsAggregation(record, record, true, false)
+				addFieldsForStatsAggregation(record, true, false)
 				a.addFieldsForThroughputCalculation(record, record, true, false)
 			} else {
-				a.addFieldsForStatsAggregation(record, record, false, true)
+				addFieldsForStatsAggregation(record, false, true)
 				a.addFieldsForThroughputCalculation(record, record, false, true)
 			}
 		} else {
-			a.addFieldsForStatsAggregation(record, record, true, true) // TODO make a wrapper function for this case
+			addFieldsForStatsAggregation(record, true, true)
 			a.addFieldsForThroughputCalculation(record, record, true, true)
 		}
 		aggregationRecord = &AggregationFlowRecord{
@@ -831,7 +818,11 @@ func copyStats(from, to *flowpb.Stats) {
 	to.OctetDeltaCount = from.OctetDeltaCount
 }
 
-func (a *aggregationProcess) addFieldsForStatsAggregation(from, to *flowpb.Flow, fillSrcStats, fillDstStats bool) {
+func addFieldsForStatsAggregation(flow *flowpb.Flow, fillSrcStats, fillDstStats bool) {
+	copyFieldsForStatsAggregation(flow, flow, fillSrcStats, fillDstStats)
+}
+
+func copyFieldsForStatsAggregation(from, to *flowpb.Flow, fillSrcStats, fillDstStats bool) {
 	to.Aggregation.StatsFromSource = &flowpb.Stats{}
 	to.Aggregation.ReverseStatsFromSource = &flowpb.Stats{}
 	to.Aggregation.StatsFromDestination = &flowpb.Stats{}
