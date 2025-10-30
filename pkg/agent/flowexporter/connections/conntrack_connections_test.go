@@ -365,12 +365,13 @@ func TestConnectionStore_MetricSettingInPoll(t *testing.T) {
 	// Hard-coded conntrack occupancy metrics for test
 	TotalConnections := 0
 	MaxConnections := 300000
+	mockConnDumper.EXPECT().DumpFlows(uint16(0)).Return(testFlows, TotalConnections, nil)
 	mockConnDumper.EXPECT().DumpFlows(uint16(openflow.CtZone)).Return(testFlows, TotalConnections, nil)
 	mockConnDumper.EXPECT().GetMaxConnections().Return(MaxConnections, nil)
 	connsLens, err := conntrackConnStore.Poll()
 	require.Nil(t, err, fmt.Sprintf("Failed to add connections to connection store: %v", err))
-	assert.Equal(t, len(connsLens), 1, "length of connsLens is expected to be 1")
-	assert.Equal(t, connsLens[0], len(testFlows), "expected connections should be equal to number of testFlows")
+	assert.Equal(t, 2, len(connsLens), "length of connsLens is expected to be 2")
+	assert.Equal(t, len(testFlows), connsLens[0], "expected connections should be equal to number of testFlows")
 	checkTotalConnectionsMetric(t, TotalConnections)
 	checkMaxConnectionsMetric(t, MaxConnections)
 }
@@ -391,10 +392,13 @@ func TestConntrackConnectionStore_Run_NetworkPolicyWait(t *testing.T) {
 	}
 	conntrackConnStore := NewConntrackConnectionStore(mockConnDumper, true, false, nil, nil, nil, nil, networkPolicyWait, testOptions)
 
-	// Create a signal channel that will be closed on the first DumpFlows call
+	// Create a signal channel that will be closed on the final DumpFlows call
 	firstPollDoneCh := make(chan struct{})
 
-	// Set up mock expectations - close signal channel on first DumpFlows call, then return normally
+	// Set up mock expectations - close signal channel on final DumpFlows call, then return normally
+	mockConnDumper.EXPECT().DumpFlows(uint16(0)).DoAndReturn(func(uint16) ([]*connection.Connection, int, error) {
+		return []*connection.Connection{}, 0, nil
+	}).Times(1)
 	mockConnDumper.EXPECT().DumpFlows(uint16(openflow.CtZone)).DoAndReturn(func(uint16) ([]*connection.Connection, int, error) {
 		defer close(firstPollDoneCh)
 		return []*connection.Connection{}, 0, nil
@@ -456,7 +460,7 @@ func TestGetZones(t *testing.T) {
 			testFlowExporterOptions.ConnectUplinkToBridge = true
 			conntrackConnStore := NewConntrackConnectionStore(mockConnDumper, true, false, npQuerier, mockPodStore, mockProxier, nil, nil, testFlowExporterOptions)
 			zones := conntrackConnStore.getZones()
-			assert.Equal(t, 1, len(zones))
+			assert.Equal(t, 2, len(zones))
 			assert.Contains(t, zones, uint16(openflow.IPCtZoneTypeRegMark.GetValue()<<12))
 		})
 		t.Run("no connectUplinkToBridge", func(t *testing.T) {
@@ -468,7 +472,7 @@ func TestGetZones(t *testing.T) {
 			testFlowExporterOptions.ConnectUplinkToBridge = false
 			conntrackConnStore := NewConntrackConnectionStore(mockConnDumper, true, false, npQuerier, mockPodStore, mockProxier, nil, nil, testFlowExporterOptions)
 			zones := conntrackConnStore.getZones()
-			assert.Equal(t, 1, len(zones))
+			assert.Equal(t, 2, len(zones))
 			assert.Contains(t, zones, uint16(openflow.CtZone))
 		})
 	})
@@ -482,7 +486,7 @@ func TestGetZones(t *testing.T) {
 			testFlowExporterOptions.ConnectUplinkToBridge = true
 			conntrackConnStore := NewConntrackConnectionStore(mockConnDumper, false, true, npQuerier, mockPodStore, mockProxier, nil, nil, testFlowExporterOptions)
 			zones := conntrackConnStore.getZones()
-			assert.Equal(t, 1, len(zones))
+			assert.Equal(t, 2, len(zones))
 			assert.Contains(t, zones, uint16(openflow.IPv6CtZoneTypeRegMark.GetValue()<<12))
 		})
 		t.Run("no connectUplinkToBridge", func(t *testing.T) {
@@ -494,7 +498,7 @@ func TestGetZones(t *testing.T) {
 			testFlowExporterOptions.ConnectUplinkToBridge = false
 			conntrackConnStore := NewConntrackConnectionStore(mockConnDumper, false, true, npQuerier, mockPodStore, mockProxier, nil, nil, testFlowExporterOptions)
 			zones := conntrackConnStore.getZones()
-			assert.Equal(t, 1, len(zones))
+			assert.Equal(t, 2, len(zones))
 			assert.Contains(t, zones, uint16(openflow.CtZoneV6))
 		})
 	})
