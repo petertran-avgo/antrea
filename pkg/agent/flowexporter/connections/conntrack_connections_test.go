@@ -454,7 +454,7 @@ func TestGetZones(t *testing.T) {
 			npQuerier := queriertest.NewMockAgentNetworkPolicyInfoQuerier(ctrl)
 			mockPodStore := objectstoretest.NewMockPodStore(ctrl)
 			testFlowExporterOptions.ConnectUplinkToBridge = true
-			conntrackConnStore := NewConntrackConnectionStore(mockConnDumper, true, false, npQuerier, mockPodStore, mockProxier, nil, testFlowExporterOptions)
+			conntrackConnStore := NewConntrackConnectionStore(mockConnDumper, true, false, npQuerier, mockPodStore, mockProxier, nil, nil, testFlowExporterOptions)
 			zones := conntrackConnStore.getZones()
 			assert.Equal(t, 1, len(zones))
 			assert.Contains(t, zones, uint16(openflow.IPCtZoneTypeRegMark.GetValue()<<12))
@@ -466,7 +466,7 @@ func TestGetZones(t *testing.T) {
 			npQuerier := queriertest.NewMockAgentNetworkPolicyInfoQuerier(ctrl)
 			mockPodStore := objectstoretest.NewMockPodStore(ctrl)
 			testFlowExporterOptions.ConnectUplinkToBridge = false
-			conntrackConnStore := NewConntrackConnectionStore(mockConnDumper, true, false, npQuerier, mockPodStore, mockProxier, nil, testFlowExporterOptions)
+			conntrackConnStore := NewConntrackConnectionStore(mockConnDumper, true, false, npQuerier, mockPodStore, mockProxier, nil, nil, testFlowExporterOptions)
 			zones := conntrackConnStore.getZones()
 			assert.Equal(t, 1, len(zones))
 			assert.Contains(t, zones, uint16(openflow.CtZone))
@@ -480,7 +480,7 @@ func TestGetZones(t *testing.T) {
 			npQuerier := queriertest.NewMockAgentNetworkPolicyInfoQuerier(ctrl)
 			mockPodStore := objectstoretest.NewMockPodStore(ctrl)
 			testFlowExporterOptions.ConnectUplinkToBridge = true
-			conntrackConnStore := NewConntrackConnectionStore(mockConnDumper, false, true, npQuerier, mockPodStore, mockProxier, nil, testFlowExporterOptions)
+			conntrackConnStore := NewConntrackConnectionStore(mockConnDumper, false, true, npQuerier, mockPodStore, mockProxier, nil, nil, testFlowExporterOptions)
 			zones := conntrackConnStore.getZones()
 			assert.Equal(t, 1, len(zones))
 			assert.Contains(t, zones, uint16(openflow.IPv6CtZoneTypeRegMark.GetValue()<<12))
@@ -492,7 +492,7 @@ func TestGetZones(t *testing.T) {
 			npQuerier := queriertest.NewMockAgentNetworkPolicyInfoQuerier(ctrl)
 			mockPodStore := objectstoretest.NewMockPodStore(ctrl)
 			testFlowExporterOptions.ConnectUplinkToBridge = false
-			conntrackConnStore := NewConntrackConnectionStore(mockConnDumper, false, true, npQuerier, mockPodStore, mockProxier, nil, testFlowExporterOptions)
+			conntrackConnStore := NewConntrackConnectionStore(mockConnDumper, false, true, npQuerier, mockPodStore, mockProxier, nil, nil, testFlowExporterOptions)
 			zones := conntrackConnStore.getZones()
 			assert.Equal(t, 1, len(zones))
 			assert.Contains(t, zones, uint16(openflow.CtZoneV6))

@@ -165,7 +165,7 @@ func TestConnTrackSystem_DumpFlows(t *testing.T) {
 
 			conns, totalConns, err := connDumperDPSystem.DumpFlows(openflow.CtZone)
 			require.NoError(t, err, "Dump flows function returned error")
-			assert.Equal(t, tc.expectedConnections, len(conns), "number of filtered connections should be equal")
+			assert.Equal(t, tc.expectedConnections, len(conns), "Expected number of returned conns to be %v after protocolFilter %v applied", tc.expectedConnections, tc.protocols)
 			assert.Equal(t, len(tc.testFlows), totalConns, "Number of connections in conntrack table should be equal to testFlows")
 		})
 	}
