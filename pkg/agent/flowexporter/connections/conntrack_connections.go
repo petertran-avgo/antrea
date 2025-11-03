@@ -17,6 +17,7 @@ package connections
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -365,4 +366,45 @@ func (cs *ConntrackConnectionStore) getZones() []uint16 {
 		}
 	}
 	return zones
+}
+
+func NewZoneZeroCache() ZoneZeroCache {
+	return ZoneZeroCache{
+		cache: map[string]*connection.Connection{},
+	}
+}
+
+// A cache holding zone zero connections for correlating the zone zero and antrea flows that make up an external flow.
+type ZoneZeroCache struct {
+	cache map[string]*connection.Connection
+}
+
+// Given a conn, generate a key that is unique to this connection
+// but can also be derived for the matching antrea ct_zone record.
+func (c ZoneZeroCache) generateKey(conn *connection.Connection) string {
+	destinationAddress := conn.FlowKey.DestinationAddress.String()
+	replyDestinationPort := strconv.FormatUint(uint64(conn.ReplyDestinationPort), 10)
+	return fmt.Sprintf("%s-%s", destinationAddress, replyDestinationPort)
+}
+
+// Add the given zone zero connection to the cache.
+func (c ZoneZeroCache) Add(conn *connection.Connection) {
+	key := c.generateKey(conn)
+	c.cache[key] = conn
+}
+
+// Given an antrea zone connection, generate a key that will equal the corresponding zone zero connection.
+func (c ZoneZeroCache) generateKeyFromAntreaZone(conn *connection.Connection) string {
+	destinationAddress := conn.FlowKey.DestinationAddress.String()
+	zoneZeroReplyDestinationPort := strconv.FormatUint(uint64(conn.FlowKey.SourcePort), 10)
+	return fmt.Sprintf("%s-%s", destinationAddress, zoneZeroReplyDestinationPort)
+}
+
+// Given an antrea ct zone connection, if there is a corresponding zone zero connection, return it. Otherwise return nil.
+func (c ZoneZeroCache) GetMatching(conn *connection.Connection) *connection.Connection {
+	key := c.generateKeyFromAntreaZone(conn)
+	if match, ok := c.cache[key]; ok {
+		return match
+	}
+	return nil
 }
