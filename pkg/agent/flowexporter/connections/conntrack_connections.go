@@ -214,6 +214,18 @@ func (cs *ConntrackConnectionStore) Poll() ([]int, error) {
 // or adds a new connection with the resolved K8s metadata.
 func (cs *ConntrackConnectionStore) AddOrUpdateConn(conn *connection.Connection) {
 	conn.IsPresent = true
+
+	if conn.Zone == 0 {
+		cs.zoneZeroCache.Add(conn)
+		fmt.Println("adding zone zero and leaving")
+		return
+	}
+
+	zoneZero := cs.zoneZeroCache.GetMatching(conn)
+	if cs.zoneZeroCache.GetMatching(conn) != nil {
+		CorrelateExternal(zoneZero, conn)
+	}
+
 	connKey := connection.NewConnectionKey(conn)
 
 	existingConn, exists := cs.connections[connKey]

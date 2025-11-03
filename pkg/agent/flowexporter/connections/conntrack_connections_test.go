@@ -277,6 +277,112 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 	}
 }
 
+func TestConntrackConnectionStore_AddOrUpdateConnTemp(t *testing.T) {
+	refTime := time.Now()
+	networkPolicyReadyTime := refTime.Add(-time.Hour)
+
+	tc := []struct {
+		name                             string
+		oldConn                          *connection.Connection
+		newConn                          connection.Connection
+		expectedConn                     connection.Connection
+		expectNetworkPolicyMetadataAdded bool
+	}{
+		{
+			name:                             "correlateConn",
+			expectNetworkPolicyMetadataAdded: true,
+			oldConn: &connection.Connection{
+				StartTime: refTime,
+				StopTime:  refTime,
+				FlowKey: connection.Tuple{
+					SourceAddress:      netip.MustParseAddr("172.18.0.1"),
+					DestinationAddress: netip.MustParseAddr("10.244.2.2"),
+					Protocol:           6,
+					SourcePort:         52142,
+					DestinationPort:    80},
+				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
+				ReplyDestinationPort:    uint16(28392),
+			},
+			newConn: connection.Connection{
+				StartTime: refTime,
+				StopTime:  refTime,
+				FlowKey: connection.Tuple{
+					SourceAddress:      netip.MustParseAddr("10.244.2.1"),
+					DestinationAddress: netip.MustParseAddr("10.244.2.2"),
+					Protocol:           6,
+					SourcePort:         28392,
+					DestinationPort:    80},
+				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				Labels:                  []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
+				ReplyDestinationAddress: netip.MustParseAddr("10.244.2.1"),
+				ReplyDestinationPort:    uint16(28392),
+				Zone:                    65520,
+			},
+			expectedConn: connection.Connection{
+				StartTime:      refTime,
+				StopTime:       refTime,
+				LastExportTime: refTime,
+				FlowKey: connection.Tuple{
+					SourceAddress:      netip.MustParseAddr("172.18.0.1"),
+					DestinationAddress: netip.MustParseAddr("10.244.2.2"),
+					Protocol:           6,
+					SourcePort:         52142,
+					DestinationPort:    80},
+				Mark:                           openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				Labels:                         []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
+				ReplyDestinationPort:           0,
+				IsPresent:                      true,
+				IsActive:                       true,
+				DestinationPodName:             "pod1",
+				DestinationPodNamespace:        "ns1",
+				DestinationServicePortName:     servicePortName.String(),
+				IngressNetworkPolicyName:       np1.Name,
+				IngressNetworkPolicyNamespace:  np1.Namespace,
+				IngressNetworkPolicyUID:        string(np1.UID),
+				IngressNetworkPolicyType:       utils.PolicyTypeToUint8(np1.Type),
+				IngressNetworkPolicyRuleName:   rule1.Name,
+				IngressNetworkPolicyRuleAction: utils.RuleActionToUint8(string(*rule1.Action)),
+				Zone:                           65520,
+				// TODO destinationServiceIPv4 == node ip
+				// destinationServicePort == NodePort
+			},
+		},
+	}
+
+	for _, c := range tc {
+		t.Run(c.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockPodStore := objectstoretest.NewMockPodStore(ctrl)
+			mockProxier := proxytest.NewMockProxier(ctrl)
+			mockConnDumper := connectionstest.NewMockConnTrackDumper(ctrl)
+			npQuerier := queriertest.NewMockAgentNetworkPolicyInfoQuerier(ctrl)
+			conntrackConnStore := NewConntrackConnectionStore(mockConnDumper, true, false, npQuerier, mockPodStore, mockProxier, nil, nil, testFlowExporterOptions)
+			// Set the networkPolicyReadyTime to simulate that NetworkPolicies are ready
+			conntrackConnStore.networkPolicyReadyTime = networkPolicyReadyTime
+
+			conntrackConnStore.AddOrUpdateConn(c.oldConn)
+
+			mockPodStore.EXPECT().GetPodByIPAndTime(c.expectedConn.FlowKey.SourceAddress.String(), gomock.Any()).Return(nil, false)
+			mockPodStore.EXPECT().GetPodByIPAndTime(c.expectedConn.FlowKey.DestinationAddress.String(), gomock.Any()).Return(pod1, true)
+			protocol, _ := lookupServiceProtocol(c.expectedConn.FlowKey.Protocol)
+			serviceStr := fmt.Sprintf("%s:%d/%s", c.expectedConn.OriginalDestinationAddress.String(), c.newConn.OriginalDestinationPort, protocol)
+			mockProxier.EXPECT().GetServiceByIP(serviceStr).Return(servicePortName, true)
+			ingressOfID := binary.BigEndian.Uint32(c.expectedConn.Labels[12:16])
+			npQuerier.EXPECT().GetRuleByFlowID(ingressOfID).Return(&rule1)
+			conntrackConnStore.AddOrUpdateConn(&c.newConn)
+
+			actualConn, exist := conntrackConnStore.GetConnByKey(c.expectedConn.FlowKey)
+			require.Equal(t, exist, true, "The connection should exist in the connection store")
+
+			assert.Equal(t, c.expectedConn.Zone, actualConn.Zone)
+			assert.Equal(t, c.expectedConn, *actualConn, "Connections should be equal")
+			//require.Equal(t, 1, conntrackConnStore.connectionStore.expirePriorityQueue.Len(), "Length of the expire priority queue should be 1")
+			//conntrackConnStore.connectionStore.expirePriorityQueue.Pop() // empty the PQ
+		})
+	}
+}
+
 // testAddNewConn tests podInfo, Services, network policy mapping.
 func testAddNewConn(mockPodStore *objectstoretest.MockPodStore, mockProxier *proxytest.MockProxier, npQuerier *queriertest.MockAgentNetworkPolicyInfoQuerier, conn connection.Connection, expectNetworkPolicyMetadataAdded bool) {
 	mockPodStore.EXPECT().GetPodByIPAndTime(conn.FlowKey.SourceAddress.String(), gomock.Any()).Return(nil, false)
