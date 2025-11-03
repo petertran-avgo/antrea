@@ -286,6 +286,8 @@ func TestConntrackConnectionStore_AddOrUpdateConnTemp(t *testing.T) {
 		oldConn                          *connection.Connection
 		newConn                          connection.Connection
 		expectedConn                     connection.Connection
+		updatedConn                      connection.Connection
+		expectedUpdatedConn              connection.Connection
 		expectNetworkPolicyMetadataAdded bool
 	}{
 		{
@@ -305,6 +307,23 @@ func TestConntrackConnectionStore_AddOrUpdateConnTemp(t *testing.T) {
 				ReplyDestinationPort:    uint16(28392),
 			},
 			newConn: connection.Connection{
+				StartTime:      refTime.Add(-(time.Second * 50)),
+				StopTime:       refTime.Add(-(time.Second * 30)),
+				LastExportTime: refTime.Add(-(time.Second * 50)),
+				FlowKey: connection.Tuple{
+					SourceAddress:      netip.MustParseAddr("10.244.2.1"),
+					DestinationAddress: netip.MustParseAddr("10.244.2.2"),
+					Protocol:           6,
+					SourcePort:         28392,
+					DestinationPort:    80},
+				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				Labels:                  []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
+				ReplyDestinationAddress: netip.MustParseAddr("10.244.2.1"),
+				ReplyDestinationPort:    uint16(28392),
+				Zone:                    65520,
+				OriginalPackets:         0xfff,
+			},
+			updatedConn: connection.Connection{
 				StartTime: refTime,
 				StopTime:  refTime,
 				FlowKey: connection.Tuple{
@@ -318,11 +337,12 @@ func TestConntrackConnectionStore_AddOrUpdateConnTemp(t *testing.T) {
 				ReplyDestinationAddress: netip.MustParseAddr("10.244.2.1"),
 				ReplyDestinationPort:    uint16(28392),
 				Zone:                    65520,
+				OriginalPackets:         0xffff,
 			},
 			expectedConn: connection.Connection{
-				StartTime:      refTime,
-				StopTime:       refTime,
-				LastExportTime: refTime,
+				StartTime:      refTime.Add(-(time.Second * 50)),
+				StopTime:       refTime.Add(-(time.Second * 30)),
+				LastExportTime: refTime.Add(-(time.Second * 50)),
 				FlowKey: connection.Tuple{
 					SourceAddress:      netip.MustParseAddr("172.18.0.1"),
 					DestinationAddress: netip.MustParseAddr("10.244.2.2"),
@@ -344,6 +364,36 @@ func TestConntrackConnectionStore_AddOrUpdateConnTemp(t *testing.T) {
 				IngressNetworkPolicyRuleName:   rule1.Name,
 				IngressNetworkPolicyRuleAction: utils.RuleActionToUint8(string(*rule1.Action)),
 				Zone:                           65520,
+				OriginalPackets:                0xfff,
+				// TODO destinationServiceIPv4 == node ip
+				// destinationServicePort == NodePort
+			},
+			expectedUpdatedConn: connection.Connection{
+				StartTime:      refTime.Add(-(time.Second * 50)),
+				StopTime:       refTime,
+				LastExportTime: refTime.Add(-(time.Second * 50)),
+				FlowKey: connection.Tuple{
+					SourceAddress:      netip.MustParseAddr("172.18.0.1"),
+					DestinationAddress: netip.MustParseAddr("10.244.2.2"),
+					Protocol:           6,
+					SourcePort:         52142,
+					DestinationPort:    80},
+				Mark:                           openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				Labels:                         []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
+				ReplyDestinationPort:           0,
+				IsPresent:                      true,
+				IsActive:                       true,
+				DestinationPodName:             "pod1",
+				DestinationPodNamespace:        "ns1",
+				DestinationServicePortName:     servicePortName.String(),
+				IngressNetworkPolicyName:       np1.Name,
+				IngressNetworkPolicyNamespace:  np1.Namespace,
+				IngressNetworkPolicyUID:        string(np1.UID),
+				IngressNetworkPolicyType:       utils.PolicyTypeToUint8(np1.Type),
+				IngressNetworkPolicyRuleName:   rule1.Name,
+				IngressNetworkPolicyRuleAction: utils.RuleActionToUint8(string(*rule1.Action)),
+				Zone:                           65520,
+				OriginalPackets:                0xffff,
 				// TODO destinationServiceIPv4 == node ip
 				// destinationServicePort == NodePort
 			},
@@ -361,8 +411,10 @@ func TestConntrackConnectionStore_AddOrUpdateConnTemp(t *testing.T) {
 			// Set the networkPolicyReadyTime to simulate that NetworkPolicies are ready
 			conntrackConnStore.networkPolicyReadyTime = networkPolicyReadyTime
 
+			// Add Zone Zero
 			conntrackConnStore.AddOrUpdateConn(c.oldConn)
 
+			// Add Antrea Zone
 			mockPodStore.EXPECT().GetPodByIPAndTime(c.expectedConn.FlowKey.SourceAddress.String(), gomock.Any()).Return(nil, false)
 			mockPodStore.EXPECT().GetPodByIPAndTime(c.expectedConn.FlowKey.DestinationAddress.String(), gomock.Any()).Return(pod1, true)
 			protocol, _ := lookupServiceProtocol(c.expectedConn.FlowKey.Protocol)
@@ -374,11 +426,13 @@ func TestConntrackConnectionStore_AddOrUpdateConnTemp(t *testing.T) {
 
 			actualConn, exist := conntrackConnStore.GetConnByKey(c.expectedConn.FlowKey)
 			require.Equal(t, exist, true, "The connection should exist in the connection store")
-
-			assert.Equal(t, c.expectedConn.Zone, actualConn.Zone)
 			assert.Equal(t, c.expectedConn, *actualConn, "Connections should be equal")
-			//require.Equal(t, 1, conntrackConnStore.connectionStore.expirePriorityQueue.Len(), "Length of the expire priority queue should be 1")
-			//conntrackConnStore.connectionStore.expirePriorityQueue.Pop() // empty the PQ
+
+			// Re-add Antrea zone
+			conntrackConnStore.AddOrUpdateConn(&c.updatedConn)
+			actualConn, exist = conntrackConnStore.GetConnByKey(c.expectedConn.FlowKey)
+			require.Equal(t, exist, true, "The connection should exist in the connection store")
+			assert.Equal(t, c.expectedUpdatedConn, *actualConn, "Connections should be equal")
 		})
 	}
 }
