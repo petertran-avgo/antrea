@@ -17,6 +17,7 @@ package connections
 import (
 	"encoding/json"
 	"fmt"
+	"net/netip"
 	"strconv"
 	"time"
 
@@ -57,6 +58,7 @@ type ConntrackConnectionStore struct {
 	// networkPolicyReadyTime is set to the current time when we are done waiting on networkPolicyWait.
 	networkPolicyReadyTime time.Time
 	connectionStore
+	zoneZeroCache ZoneZeroCache
 }
 
 type L7EventMapGetter interface {
@@ -83,6 +85,7 @@ func NewConntrackConnectionStore(
 		connectUplinkToBridge: o.ConnectUplinkToBridge,
 		l7EventMapGetter:      l7EventMapGetterFunc,
 		networkPolicyWait:     networkPolicyWait,
+		zoneZeroCache:         NewZoneZeroCache(),
 	}
 }
 
@@ -388,9 +391,20 @@ func (c ZoneZeroCache) generateKey(conn *connection.Connection) string {
 }
 
 // Add the given zone zero connection to the cache.
-func (c ZoneZeroCache) Add(conn *connection.Connection) {
+func (c ZoneZeroCache) Add(conn *connection.Connection) error {
+	if conn.Zone != 0 {
+		return fmt.Errorf("Cannot add connections to cache that are not zone zero. Connection has zone %v", conn.Zone)
+	}
 	key := c.generateKey(conn)
 	c.cache[key] = conn
+	return nil
+}
+
+// Return true if the given connection is in the cache.
+func (c ZoneZeroCache) Contains(conn *connection.Connection) bool {
+	key := c.generateKey(conn)
+	_, ok := c.cache[key]
+	return ok
 }
 
 // Given an antrea zone connection, generate a key that will equal the corresponding zone zero connection.
@@ -407,4 +421,14 @@ func (c ZoneZeroCache) GetMatching(conn *connection.Connection) *connection.Conn
 		return match
 	}
 	return nil
+}
+
+// Given a pair of matching connections, modify the antreaZone connection by
+// filling in the fields needed from the zoneZero connection
+func CorrelateExternal(zoneZero, antreaZone *connection.Connection) {
+	fmt.Println(zoneZero, antreaZone)
+	antreaZone.ReplyDestinationPort = 0
+	antreaZone.ReplyDestinationAddress = netip.Addr{}
+	antreaZone.FlowKey.SourcePort = zoneZero.FlowKey.SourcePort
+	antreaZone.FlowKey.SourceAddress = zoneZero.FlowKey.SourceAddress
 }

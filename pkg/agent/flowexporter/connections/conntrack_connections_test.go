@@ -506,23 +506,45 @@ func TestGetZones(t *testing.T) {
 
 func TestZoneZeroCache(t *testing.T) {
 	t.Run("Add", func(t *testing.T) {
-		cache := NewZoneZeroCache()
-		refTime := time.Now()
-		zoneZeroConn := &connection.Connection{
-			StartTime: refTime,
-			StopTime:  refTime,
-			FlowKey: connection.Tuple{
-				SourceAddress:      netip.MustParseAddr("172.18.0.1"),
-				DestinationAddress: netip.MustParseAddr("10.244.2.2"),
-				Protocol:           6,
-				SourcePort:         52142,
-				DestinationPort:    80},
-			Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
-			ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
-			ReplyDestinationPort:    uint16(28392),
-		}
-		cache.Add(zoneZeroConn)
-		assert.Equal(t, 1, len(cache.cache), "Expected cache to contain newly added connection")
+		t.Run("Adding a zone zero record", func(t *testing.T) {
+			cache := NewZoneZeroCache()
+			refTime := time.Now()
+			zoneZeroConn := &connection.Connection{
+				StartTime: refTime,
+				StopTime:  refTime,
+				FlowKey: connection.Tuple{
+					SourceAddress:      netip.MustParseAddr("172.18.0.1"),
+					DestinationAddress: netip.MustParseAddr("10.244.2.2"),
+					Protocol:           6,
+					SourcePort:         52142,
+					DestinationPort:    80},
+				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
+				ReplyDestinationPort:    uint16(28392),
+			}
+			err := cache.Add(zoneZeroConn)
+			assert.Nil(t, err, "Expected adding zone 0 connection to not error")
+			assert.Equal(t, 1, len(cache.cache), "Expected cache to contain newly added connection")
+		})
+		t.Run("Adding a record not from zone zero", func(t *testing.T) {
+			cache := NewZoneZeroCache()
+			refTime := time.Now()
+			zoneZeroConn := &connection.Connection{
+				StartTime: refTime,
+				StopTime:  refTime,
+				FlowKey: connection.Tuple{
+					SourceAddress:      netip.MustParseAddr("172.18.0.1"),
+					DestinationAddress: netip.MustParseAddr("10.244.2.2"),
+					Protocol:           6,
+					SourcePort:         52142,
+					DestinationPort:    80},
+				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
+				ReplyDestinationPort:    uint16(28392),
+				Zone:                    123,
+			}
+			assert.Error(t, cache.Add(zoneZeroConn), "Expected an error adding connection with zone 123")
+		})
 	})
 	t.Run("GetMatching", func(t *testing.T) {
 		t.Run("Has Match", func(t *testing.T) {
@@ -592,5 +614,91 @@ func TestZoneZeroCache(t *testing.T) {
 			match := cache.GetMatching(antreaZeroConn)
 			assert.Nil(t, match, "Expected cache to return a nil match")
 		})
+	})
+	t.Run("Contains", func(t *testing.T) {
+		t.Run("After adding connection", func(t *testing.T) {
+			cache := NewZoneZeroCache()
+			refTime := time.Now()
+			zoneZeroConn := &connection.Connection{
+				StartTime: refTime,
+				StopTime:  refTime,
+				FlowKey: connection.Tuple{
+					SourceAddress:      netip.MustParseAddr("172.18.0.1"),
+					DestinationAddress: netip.MustParseAddr("10.244.2.2"),
+					Protocol:           6,
+					SourcePort:         52142,
+					DestinationPort:    80},
+				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
+				ReplyDestinationPort:    uint16(28392),
+			}
+			cache.Add(zoneZeroConn)
+			assert.True(t, cache.Contains(zoneZeroConn), "Expected cache to contain previously added connection")
+		})
+		t.Run("On an empty cache", func(t *testing.T) {
+			cache := NewZoneZeroCache()
+			refTime := time.Now()
+			zoneZeroConn := &connection.Connection{
+				StartTime: refTime,
+				StopTime:  refTime,
+				FlowKey: connection.Tuple{
+					SourceAddress:      netip.MustParseAddr("172.18.0.1"),
+					DestinationAddress: netip.MustParseAddr("10.244.2.2"),
+					Protocol:           6,
+					SourcePort:         52142,
+					DestinationPort:    80},
+				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
+				ReplyDestinationPort:    uint16(28392),
+			}
+			assert.False(t, cache.Contains(zoneZeroConn), "Expected cache to not contain any connections")
+		})
+	})
+}
+
+func TestCorrelateExternal(t *testing.T) {
+	t.Run("solution 2", func(t *testing.T) { // TODO when solution is finalized, backfill new fields
+
+		refTime := time.Now()
+		zoneZero := connection.Connection{
+			StartTime: refTime,
+			StopTime:  refTime,
+			FlowKey: connection.Tuple{
+				SourceAddress:      netip.MustParseAddr("172.18.0.1"),
+				DestinationAddress: netip.MustParseAddr("10.244.2.2"),
+				Protocol:           6,
+				SourcePort:         52142,
+				DestinationPort:    80},
+			Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+			ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
+			ReplyDestinationPort:    uint16(28392),
+		}
+		antreaZone := connection.Connection{
+			StartTime: refTime,
+			StopTime:  refTime,
+			FlowKey: connection.Tuple{
+				SourceAddress:      netip.MustParseAddr("10.244.2.1"),
+				DestinationAddress: netip.MustParseAddr("10.244.2.2"),
+				Protocol:           6,
+				SourcePort:         55555,
+				DestinationPort:    80},
+			Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+			ReplyDestinationAddress: netip.MustParseAddr("10.244.2.1"),
+			ReplyDestinationPort:    uint16(28392),
+		}
+		expected := connection.Connection{
+			StartTime: refTime,
+			StopTime:  refTime,
+			FlowKey: connection.Tuple{
+				SourceAddress:      netip.MustParseAddr("172.18.0.1"),
+				DestinationAddress: netip.MustParseAddr("10.244.2.2"),
+				Protocol:           6,
+				SourcePort:         52142,
+				DestinationPort:    80},
+			Mark: openflow.ServiceCTMark.GetValue(),
+		}
+		CorrelateExternal(&zoneZero, &antreaZone)
+		assert.Equal(t, expected, antreaZone)
+
 	})
 }
