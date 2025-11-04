@@ -24,9 +24,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"k8s.io/apimachinery/pkg/labels"
 	clocktesting "k8s.io/utils/clock/testing"
 
 	flowpb "antrea.io/antrea/pkg/apis/flow/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func init() {
@@ -1009,4 +1011,30 @@ func runAggregationAndCheckResult(t *testing.T, ap *aggregationProcess, clock *c
 	assert.EqualValues(t, 888, aggRecord.Record.Aggregation.ReverseThroughputFromSource)
 	assert.EqualValues(t, 915, aggRecord.Record.Aggregation.ThroughputFromDestination)
 	assert.EqualValues(t, 915, aggRecord.Record.Aggregation.ReverseThroughputFromDestination)
+}
+
+type mockLister struct{}
+
+func (m mockLister) List(selector labels.Selector) ([]*corev1.Node, error) {
+	gatewayNode := &corev1.Node{Spec: corev1.NodeSpec{
+		PodCIDR: "10.244.2.0/24",
+	}}
+	return []*corev1.Node{gatewayNode}, nil
+}
+
+func (m mockLister) Get(name string) (*corev1.Node, error) {
+	return nil, nil
+}
+
+func TestIsGateway(t *testing.T) {
+	t.Run("IP is a node gateway", func(t *testing.T) {
+		ip := []byte{0x0a, 0xf4, 0x02, 0x01} // 10.244.2.1
+
+		assert.True(t, IsGateway(mockLister{}, ip), "Expected 10.244.2.1 to be considered a gateway")
+	})
+	t.Run("IP is not a gateway", func(t *testing.T) {
+		ip := []byte{0xac, 0x12, 0x00, 0x01} // 172.18.0.1
+
+		assert.False(t, IsGateway(mockLister{}, ip), "Expected 172.18.0.1 not to be a gateway")
+	})
 }

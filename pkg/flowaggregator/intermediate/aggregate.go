@@ -19,17 +19,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 
 	flowpb "antrea.io/antrea/pkg/apis/flow/v1alpha1"
 	"antrea.io/antrea/pkg/flowaggregator/flowrecord"
+	listers "k8s.io/client-go/listers/core/v1"
 )
 
 var (
@@ -964,4 +967,39 @@ func fillHttpVals(incomingHttpVals, existingHttpVals []byte) ([]byte, error) {
 		return nil, fmt.Errorf("error converting JSON to string: %w", err)
 	}
 	return updatedHttpVals, nil
+}
+
+// Returns true if the given ip is a Gateway IP from one of the nodes on the cluster.
+// If there are errors, they are logged and false is returned.
+func IsGateway(nodeLister listers.NodeLister, ip []byte) bool {
+	addr, ok := netip.AddrFromSlice(ip)
+	if !ok {
+		klog.Errorf("Failed to determine if ip is gateway. IP %v could not be converted to Addr", ip)
+		return false
+	}
+	nodes, err := nodeLister.List(labels.Everything())
+	if err != nil {
+		klog.Errorf("Failed to determine if ip is gateway: %v", err)
+		return false
+	}
+
+	if len(nodes) == 0 {
+		klog.Error("Failed to determine if ip is gateway. NodeLister returned 0 nodes")
+	}
+
+	for _, node := range nodes {
+		podCIDR := node.Spec.PodCIDR
+		if podCIDR == "" {
+			continue
+		}
+		prefix, err := netip.ParsePrefix(podCIDR)
+		if err != nil {
+			klog.Errorf("Failed to determine if ip is gateway. Could not parse pod CIDR %s for node %s: %v", podCIDR, node.Name, err)
+		}
+		gatewayAddr := prefix.Addr().Next()
+		if addr == gatewayAddr {
+			return true
+		}
+	}
+	return false
 }
