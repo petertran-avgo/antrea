@@ -42,7 +42,7 @@ import (
 	"antrea.io/antrea/pkg/flowaggregator/querier"
 	"antrea.io/antrea/pkg/ipfix"
 	"antrea.io/antrea/pkg/util/objectstore"
-	informers "k8s.io/client-go/informers/core/v1"
+	listers "k8s.io/client-go/listers/core/v1"
 )
 
 const aggregationWorkerNum = 2
@@ -95,7 +95,7 @@ type flowAggregator struct {
 	logTickerDuration           time.Duration
 	recordCh                    chan *flowpb.Flow
 	exportersMutex              sync.Mutex
-	nodeInformer                informers.NodeInformer
+	nodeLister                  listers.NodeLister
 }
 
 func NewFlowAggregator(
@@ -105,7 +105,7 @@ func NewFlowAggregator(
 	nodeStore objectstore.NodeStore,
 	serviceStore objectstore.ServiceStore,
 	configFile string,
-	nodeInformer informers.NodeInformer,
+	nodeLister listers.NodeLister,
 ) (*flowAggregator, error) {
 	if len(configFile) == 0 {
 		return nil, fmt.Errorf("configFile is empty string")
@@ -161,8 +161,8 @@ func NewFlowAggregator(
 		APIServer:                   opt.Config.APIServer,
 		logTickerDuration:           time.Minute,
 		// We support buffering a small amount of flow records.
-		recordCh:     make(chan *flowpb.Flow, 128),
-		nodeInformer: nodeInformer,
+		recordCh:   make(chan *flowpb.Flow, 128),
+		nodeLister: nodeLister,
 	}
 	if err := fa.InitCollectors(); err != nil {
 		return nil, fmt.Errorf("error when creating collectors: %w", err)
@@ -234,7 +234,7 @@ func (fa *flowAggregator) InitAggregationProcess() error {
 		ActiveExpiryTimeout:   fa.activeFlowRecordTimeout,
 		InactiveExpiryTimeout: fa.inactiveFlowRecordTimeout,
 	}
-	fa.aggregationProcess, err = intermediate.InitAggregationProcess(apInput)
+	fa.aggregationProcess, err = intermediate.InitAggregationProcess(apInput, fa.nodeLister)
 	return err
 }
 

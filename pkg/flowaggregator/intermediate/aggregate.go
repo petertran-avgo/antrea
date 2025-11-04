@@ -69,6 +69,7 @@ type aggregationProcess struct {
 	// FromExternalFlowMap stores records with FlowType "FromExternal" with key
 	// being the destination ip and port
 	FromExternalFlowMap map[string]*FromExternalFlowStash
+	nodeLister          listers.NodeLister
 }
 
 type AggregationInput struct {
@@ -87,7 +88,7 @@ type FromExternalFlowStash struct {
 	DestinationNodeFlow *AggregationFlowRecord
 }
 
-func initAggregationProcessWithClock(input AggregationInput, clock clock.Clock) (*aggregationProcess, error) {
+func initAggregationProcessWithClock(input AggregationInput, clock clock.Clock, nodeLister listers.NodeLister) (*aggregationProcess, error) {
 	if input.RecordChan == nil {
 		return nil, fmt.Errorf("cannot create aggregationProcess process without input channel")
 	}
@@ -106,11 +107,12 @@ func initAggregationProcessWithClock(input AggregationInput, clock clock.Clock) 
 		make(chan bool),
 		clock,
 		make(map[string]*FromExternalFlowStash),
+		nodeLister,
 	}, nil
 }
 
-func InitAggregationProcess(input AggregationInput) (*aggregationProcess, error) {
-	return initAggregationProcessWithClock(input, clock.RealClock{})
+func InitAggregationProcess(input AggregationInput, nodeLister listers.NodeLister) (*aggregationProcess, error) {
+	return initAggregationProcessWithClock(input, clock.RealClock{}, nodeLister)
 }
 
 func (a *aggregationProcess) Start() {
@@ -509,8 +511,8 @@ func (a *aggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record *fl
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
-	if record.K8S.FlowType == flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL {
-		a.addOrUpdateFromExternalRecord(flowKey, record, isIPv4)
+	if a.FromExternalCorrelationRequired(record) {
+		//a.addOrUpdateFromExternalRecord(flowKey, record, isIPv4)
 		return
 	}
 
@@ -971,13 +973,17 @@ func fillHttpVals(incomingHttpVals, existingHttpVals []byte) ([]byte, error) {
 
 // Returns true if the given ip is a Gateway IP from one of the nodes on the cluster.
 // If there are errors, they are logged and false is returned.
-func IsGateway(nodeLister listers.NodeLister, ip []byte) bool {
+func (a *aggregationProcess) IsGateway(ip []byte) bool {
 	addr, ok := netip.AddrFromSlice(ip)
 	if !ok {
 		klog.Errorf("Failed to determine if ip is gateway. IP %v could not be converted to Addr", ip)
 		return false
 	}
-	nodes, err := nodeLister.List(labels.Everything())
+	if a.nodeLister == nil {
+		klog.Error("Failed to determine if ip is gateway. NodeLister is required but is nil")
+		return false
+	}
+	nodes, err := a.nodeLister.List(labels.Everything())
 	if err != nil {
 		klog.Errorf("Failed to determine if ip is gateway: %v", err)
 		return false
@@ -1000,6 +1006,30 @@ func IsGateway(nodeLister listers.NodeLister, ip []byte) bool {
 		if addr == gatewayAddr {
 			return true
 		}
+	}
+	return false
+}
+
+// Returns true if record is FromExternal and represents the flow created from
+// an external connection where the sourceNode and destinationNode are the same.
+// When a flow goes through two distinct nodes, the sourceNode flow has empty destinationNode
+// and the destinationNode has the gatewayIP as the sourceAddress. If flow is invaldate, false
+// is returned
+func (a *aggregationProcess) FromExternalCorrelationRequired(flow *flowpb.Flow) bool {
+	if flow.K8S == nil || flow.K8S.FlowType != flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL {
+		return false
+	}
+	if flow.Ip == nil {
+		klog.Errorf("Failed to determine correlation of FromExternal record required. Ip missing from flow %v", flow)
+		return false
+	}
+	// DestinationNode flows have source IP as the gateway
+	if a.IsGateway(flow.Ip.Source) {
+		return true
+	}
+	// SourceNode flows do not have podName
+	if flow.K8S == nil || flow.K8S.DestinationPodName == "" {
+		return true
 	}
 	return false
 }
