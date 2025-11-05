@@ -554,10 +554,14 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		flowKey := destinationNodeRecordFlowKey
 		flowKey.SourceAddress = flowrecord.IpAddressAsString(sourceNodeRecord.Ip.Source)
 		assert.Equal(t, 1, ap.expirePriorityQueue.Len(), "Expected flow to be correlated and added to queue")
-		got := ap.expirePriorityQueue.Peek().flowKey
+		item := ap.expirePriorityQueue.Peek()
+		got := item.flowKey
 		assert.Equal(t, flowKey, got, "Expected flow to be correlated and added to queue")
-	})
 
+		_, exists = ap.flowKeyRecordMap[*flowKey]
+		assert.True(t, exists, "Expected correlated flow to be added to flowKeyRecordMap")
+		assert.True(t, item.flowRecord.ReadyToSend, "Expected correlated flow to be marked ready to send for export")
+	})
 	t.Run("destination node flow arrives first", func(t *testing.T) {
 		ap := newAggregationProcess()
 		ap.nodeLister = mockLister{}
@@ -576,26 +580,14 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		flowKey := destinationNodeRecordFlowKey
 		flowKey.SourceAddress = flowrecord.IpAddressAsString(sourceNodeRecord.Ip.Source)
 		assert.Equal(t, 1, ap.expirePriorityQueue.Len(), "Expected flow to be correlated and added to queue")
-		got := ap.expirePriorityQueue.Peek().flowKey
+		item := ap.expirePriorityQueue.Peek()
+		got := item.flowKey
 		assert.Equal(t, flowKey, got, "Expected flow to be correlated and added to queue")
+
+		_, exists = ap.flowKeyRecordMap[*flowKey]
+		assert.True(t, exists, "Expected correlated flow to be added to flowKeyRecordMap")
+		assert.True(t, item.flowRecord.ReadyToSend, "Expected correlated flow to be marked ready to send for export")
 	})
-
-	//t.Run("source node flow arrives multiple times", func(t *testing.T) {
-	//	ap := newAggregationProcess()
-	//	sourceNodeRecord, sourceNodeRecordFlowKey := generateSourceNodeFlowAndFlowKey()
-
-	//	ap.addOrUpdateRecordInMap(sourceNodeRecordFlowKey, sourceNodeRecord, false)
-	//	// Second add does not panic
-	//	ap.addOrUpdateRecordInMap(sourceNodeRecordFlowKey, sourceNodeRecord, false)
-	//})
-	//t.Run("destionation node flow arrives multiple times", func(t *testing.T) {
-	//	ap := newAggregationProcess()
-	//	sourceNodeRecord, sourceNodeRecordFlowKey := generateSourceNodeFlowAndFlowKey()
-
-	//	ap.addOrUpdateRecordInMap(sourceNodeRecordFlowKey, sourceNodeRecord, false)
-	//	// Second add does not panic
-	//	ap.addOrUpdateRecordInMap(sourceNodeRecordFlowKey, sourceNodeRecord, false)
-	//})
 }
 
 func TestAggregateRecordsForInterNodeFlow(t *testing.T) {
