@@ -64,12 +64,12 @@ type aggregationProcess struct {
 	// record map.
 	inactiveExpiryTimeout time.Duration
 	// stopChan is the channel to receive stop message
-	stopChan chan bool
-	clock    clock.Clock
-	// FromExternalFlowMap stores records with FlowType "FromExternal" with key
-	// being the destination ip and port
+	stopChan            chan bool
+	clock               clock.Clock
 	FromExternalFlowMap map[string]*FromExternalFlowStash
-	nodeLister          listers.NodeLister
+	// FromExternalCache stores flows that need correlation
+	FromExternalCache map[string]*flowpb.Flow
+	nodeLister        listers.NodeLister
 }
 
 type AggregationInput struct {
@@ -107,6 +107,7 @@ func initAggregationProcessWithClock(input AggregationInput, clock clock.Clock, 
 		make(chan bool),
 		clock,
 		make(map[string]*FromExternalFlowStash),
+		make(map[string]*flowpb.Flow),
 		nodeLister,
 	}, nil
 }
@@ -973,7 +974,7 @@ func fillHttpVals(incomingHttpVals, existingHttpVals []byte) ([]byte, error) {
 
 // Returns true if the given ip is a Gateway IP from one of the nodes on the cluster.
 // If there are errors, they are logged and false is returned.
-func (a *aggregationProcess) IsGateway(ip []byte) bool {
+func (a *aggregationProcess) IsGateway(ip []byte) bool { // todo maybe this should be private?
 	addr, ok := netip.AddrFromSlice(ip)
 	if !ok {
 		klog.Errorf("Failed to determine if ip is gateway. IP %v could not be converted to Addr", ip)
@@ -1029,6 +1030,35 @@ func (a *aggregationProcess) FromExternalCorrelationRequired(flow *flowpb.Flow) 
 	}
 	// SourceNode flows do not have podName
 	if flow.K8S == nil || flow.K8S.DestinationPodName == "" {
+		return true
+	}
+	return false
+}
+
+// Return a key unique to the pair of flows that make up a FromExternal flow
+func (a *aggregationProcess) generateFromExternalCacheKey(record *flowpb.Flow) string {
+	var gateway string
+	var gatewayPort string
+	if a.IsGateway(record.Ip.Source) {
+		gateway = flowrecord.IpAddressAsString(record.ReplyDestinationAddress)
+		gatewayPort = strconv.FormatUint(uint64(record.ReplyDestinationPort), 10)
+	} else {
+		gateway = flowrecord.IpAddressAsString(record.Ip.Source)
+		gatewayPort = strconv.FormatUint(uint64(record.Transport.SourcePort), 10)
+	}
+	return fmt.Sprintf("%s-%s-%s-%s",
+		gateway,
+		gatewayPort,
+		flowrecord.IpAddressAsString(record.Ip.Destination),
+		strconv.FormatUint(uint64(record.Transport.DestinationPort), 10))
+}
+
+// If FromExternal flow is not yet in the cache, cache it and return true.
+// If the flow is in the cache, return false
+func (a *aggregationProcess) CacheIfNew(flow *flowpb.Flow) bool {
+	key := a.generateFromExternalCacheKey(flow)
+	if _, exists := a.FromExternalCache[key]; !exists {
+		a.FromExternalCache[key] = flow
 		return true
 	}
 	return false
