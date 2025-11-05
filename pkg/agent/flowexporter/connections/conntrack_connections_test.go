@@ -122,6 +122,7 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 				FlowKey:   tuple,
 				Labels:    []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
 				Mark:      openflow.ServiceCTMark.GetValue(),
+				Zone:      65520,
 			},
 			expectedConn: connection.Connection{
 				StartTime:                      refTime,
@@ -141,6 +142,7 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 				IngressNetworkPolicyType:       utils.PolicyTypeToUint8(np1.Type),
 				IngressNetworkPolicyRuleName:   rule1.Name,
 				IngressNetworkPolicyRuleAction: utils.RuleActionToUint8(string(*rule1.Action)),
+				Zone:                           65520,
 			},
 		},
 		{
@@ -156,6 +158,7 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 				ReverseBytes:    0xbaa,
 				FlowKey:         tuple,
 				IsPresent:       true,
+				Zone:            65520,
 			},
 			newConn: connection.Connection{
 				StartTime:       refTime.Add(-(time.Second * 50)),
@@ -166,6 +169,7 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 				ReverseBytes:    0xbaaa,
 				FlowKey:         tuple,
 				IsPresent:       true,
+				Zone:            65520,
 			},
 			expectedConn: connection.Connection{
 				StartTime:       refTime.Add(-(time.Second * 50)),
@@ -178,6 +182,7 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 				FlowKey:         tuple,
 				IsPresent:       true,
 				IsActive:        true,
+				Zone:            65520,
 			},
 		},
 		{
@@ -231,6 +236,7 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 				FlowKey:   tuple,
 				Labels:    []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
 				Mark:      openflow.ServiceCTMark.GetValue(),
+				Zone:      65520,
 			},
 			expectedConn: connection.Connection{
 				StartTime:                  networkPolicyReadyTime.Add(-time.Minute),
@@ -244,6 +250,7 @@ func TestConntrackConnectionStore_AddOrUpdateConn(t *testing.T) {
 				DestinationPodName:         "pod1",
 				DestinationPodNamespace:    "ns1",
 				DestinationServicePortName: servicePortName.String(),
+				Zone:                       65520,
 				// NetworkPolicy fields should be empty for old connections
 			},
 		},
@@ -351,7 +358,6 @@ func TestConntrackConnectionStore_AddOrUpdateConnTemp(t *testing.T) {
 					DestinationPort:    80},
 				Mark:                           openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
 				Labels:                         []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
-				ReplyDestinationPort:           0,
 				IsPresent:                      true,
 				IsActive:                       true,
 				DestinationPodName:             "pod1",
@@ -367,6 +373,8 @@ func TestConntrackConnectionStore_AddOrUpdateConnTemp(t *testing.T) {
 				OriginalPackets:                0xfff,
 				// TODO destinationServiceIPv4 == node ip
 				// destinationServicePort == NodePort
+				ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
+				ReplyDestinationPort:    uint16(28392),
 			},
 			expectedUpdatedConn: connection.Connection{
 				StartTime:      refTime.Add(-(time.Second * 50)),
@@ -380,7 +388,6 @@ func TestConntrackConnectionStore_AddOrUpdateConnTemp(t *testing.T) {
 					DestinationPort:    80},
 				Mark:                           openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
 				Labels:                         []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
-				ReplyDestinationPort:           0,
 				IsPresent:                      true,
 				IsActive:                       true,
 				DestinationPodName:             "pod1",
@@ -396,6 +403,8 @@ func TestConntrackConnectionStore_AddOrUpdateConnTemp(t *testing.T) {
 				OriginalPackets:                0xffff,
 				// TODO destinationServiceIPv4 == node ip
 				// destinationServicePort == NodePort
+				ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
+				ReplyDestinationPort:    uint16(28392),
 			},
 		},
 	}
@@ -855,7 +864,9 @@ func TestCorrelateExternal(t *testing.T) {
 				Protocol:           6,
 				SourcePort:         52142,
 				DestinationPort:    80},
-			Mark: openflow.ServiceCTMark.GetValue(),
+			Mark:                    openflow.ServiceCTMark.GetValue(),
+			ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
+			ReplyDestinationPort:    uint16(28392),
 		}
 		CorrelateExternal(&zoneZero, &antreaZone)
 		assert.Equal(t, expected, antreaZone)

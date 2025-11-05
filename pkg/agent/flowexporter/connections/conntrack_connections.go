@@ -17,7 +17,6 @@ package connections
 import (
 	"encoding/json"
 	"fmt"
-	"net/netip"
 	"strconv"
 	"time"
 
@@ -217,12 +216,10 @@ func (cs *ConntrackConnectionStore) AddOrUpdateConn(conn *connection.Connection)
 
 	if conn.Zone == 0 {
 		cs.zoneZeroCache.Add(conn)
-		fmt.Println("adding zone zero and leaving")
 		return
 	}
 
-	zoneZero := cs.zoneZeroCache.GetMatching(conn)
-	if cs.zoneZeroCache.GetMatching(conn) != nil {
+	if zoneZero := cs.zoneZeroCache.GetMatching(conn); zoneZero != nil {
 		CorrelateExternal(zoneZero, conn)
 	}
 
@@ -438,9 +435,8 @@ func (c ZoneZeroCache) GetMatching(conn *connection.Connection) *connection.Conn
 // Given a pair of matching connections, modify the antreaZone connection by
 // filling in the fields needed from the zoneZero connection
 func CorrelateExternal(zoneZero, antreaZone *connection.Connection) {
-	fmt.Println(zoneZero, antreaZone)
-	antreaZone.ReplyDestinationPort = 0
-	antreaZone.ReplyDestinationAddress = netip.Addr{}
 	antreaZone.FlowKey.SourcePort = zoneZero.FlowKey.SourcePort
 	antreaZone.FlowKey.SourceAddress = zoneZero.FlowKey.SourceAddress
+	antreaZone.ReplyDestinationAddress = zoneZero.ReplyDestinationAddress
+	antreaZone.ReplyDestinationPort = zoneZero.ReplyDestinationPort
 }
