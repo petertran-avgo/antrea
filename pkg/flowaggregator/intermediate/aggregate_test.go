@@ -28,6 +28,7 @@ import (
 	clocktesting "k8s.io/utils/clock/testing"
 
 	flowpb "antrea.io/antrea/pkg/apis/flow/v1alpha1"
+	"antrea.io/antrea/pkg/flowaggregator/flowrecord"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -458,10 +459,12 @@ func generateDestinationNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 			PacketTotalCount: destinationNodePackets,
 			OctetTotalCount:  octetTotalCount,
 		},
-		ReverseStats: &flowpb.Stats{},
-		StartTs:      destinationNodeStart,
-		EndTs:        destinationNodeEnd,
-		Zone:         65520,
+		ReverseStats:            &flowpb.Stats{},
+		StartTs:                 destinationNodeStart,
+		EndTs:                   destinationNodeEnd,
+		Zone:                    65520,
+		ReplyDestinationAddress: []byte{0xac, 0x12, 0x00, 0x01}, // 172.12.18.01 // TODO pull this into const
+		ReplyDestinationPort:    uint32(50634),
 	}
 	destinationNodeFlowKey, _ := getFlowKeyFromRecord(destinationNodeRecord)
 	return destinationNodeRecord, destinationNodeFlowKey
@@ -531,33 +534,51 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 
 		ap.addOrUpdateRecordInMap(flowKey, destinationNodeRecord, false)
 		got := ap.expirePriorityQueue.Peek().flowKey
-		assert.Equal(t, flowKey, got, "Expected correlated flow to be added to queue")
+		assert.Equal(t, flowKey, got, "Expected previously correlated flow to be added to queue")
 	})
-	//t.Run("source node flow arrives first", func(t *testing.T) {
-	//	ap := newAggregationProcess()
-	//	destinationNodeRecord, destinationNodeRecordFlowKey := generateDestinationNodeFlowAndFlowKey()
-	//	sourceNodeRecord, sourceNodeRecordFlowKey := generateSourceNodeFlowAndFlowKey()
+	t.Run("source node flow arrives first", func(t *testing.T) {
+		ap := newAggregationProcess()
+		ap.nodeLister = mockLister{}
 
-	//	ap.addOrUpdateRecordInMap(sourceNodeRecordFlowKey, sourceNodeRecord, false)
-	//})
+		// Add the sourceNodeFlow
+		sourceNodeRecord, sourceNodeRecordFlowKey := generateSourceNodeFlowAndFlowKey()
+		ap.addOrUpdateRecordInMap(sourceNodeRecordFlowKey, sourceNodeRecord, false)
+		key := ap.generateFromExternalCacheKey(sourceNodeRecord)
+		_, exists := ap.FromExternalCache[key]
+		assert.True(t, exists, "Expected flow to have been cached")
 
-	//t.Run("destination node flow arrives first", func(t *testing.T) {
-	//	ap := newAggregationProcess()
+		// Add the destinationNodeFlow
+		destinationNodeRecord, destinationNodeRecordFlowKey := generateDestinationNodeFlowAndFlowKey()
+		ap.addOrUpdateRecordInMap(destinationNodeRecordFlowKey, destinationNodeRecord, false)
 
-	//	destinationNodeRecord, destinationNodeRecordFlowKey := generateDestinationNodeFlowAndFlowKey()
-	//	sourceNodeRecord, sourceNodeRecordFlowKey := generateSourceNodeFlowAndFlowKey()
+		flowKey := destinationNodeRecordFlowKey
+		flowKey.SourceAddress = flowrecord.IpAddressAsString(sourceNodeRecord.Ip.Source)
+		assert.Equal(t, 1, ap.expirePriorityQueue.Len(), "Expected flow to be correlated and added to queue")
+		got := ap.expirePriorityQueue.Peek().flowKey
+		assert.Equal(t, flowKey, got, "Expected flow to be correlated and added to queue")
+	})
 
-	//	ap.addOrUpdateRecordInMap(destinationNodeRecordFlowKey, destinationNodeRecord, false)
-	//	assert.Nil(t, sourceNodeRecord.Aggregation)
-	//	assertPriorityQueueRecordInitialized(t, ap)
-	//	assert.Equal(t, 1, len(ap.FromExternalFlowMap))
-	//	recordForExport := ap.expirePriorityQueue.Pop().(*ItemToExpire).flowRecord
+	t.Run("destination node flow arrives first", func(t *testing.T) {
+		ap := newAggregationProcess()
+		ap.nodeLister = mockLister{}
 
-	//	ap.addOrUpdateRecordInMap(sourceNodeRecordFlowKey, sourceNodeRecord, false)
+		// Add the destinationNodeFlow
+		destinationNodeRecord, destinationNodeRecordFlowKey := generateDestinationNodeFlowAndFlowKey()
+		ap.addOrUpdateRecordInMap(destinationNodeRecordFlowKey, destinationNodeRecord, false)
+		key := ap.generateFromExternalCacheKey(destinationNodeRecord)
+		_, exists := ap.FromExternalCache[key]
+		assert.True(t, exists, "Expected flow to have been cached")
 
-	//	assertUpdated(t, recordForExport)
-	//	assertCorrelatedStats(t, recordForExport)
-	//})
+		// Add the sourceNodeFlow
+		sourceNodeRecord, sourceNodeRecordFlowKey := generateSourceNodeFlowAndFlowKey()
+		ap.addOrUpdateRecordInMap(sourceNodeRecordFlowKey, sourceNodeRecord, false)
+
+		flowKey := destinationNodeRecordFlowKey
+		flowKey.SourceAddress = flowrecord.IpAddressAsString(sourceNodeRecord.Ip.Source)
+		assert.Equal(t, 1, ap.expirePriorityQueue.Len(), "Expected flow to be correlated and added to queue")
+		got := ap.expirePriorityQueue.Peek().flowKey
+		assert.Equal(t, flowKey, got, "Expected flow to be correlated and added to queue")
+	})
 
 	//t.Run("source node flow arrives multiple times", func(t *testing.T) {
 	//	ap := newAggregationProcess()

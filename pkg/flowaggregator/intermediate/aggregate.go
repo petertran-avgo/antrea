@@ -513,8 +513,12 @@ func (a *aggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record *fl
 	defer a.mutex.Unlock()
 
 	if a.FromExternalCorrelationRequired(record) {
-		//a.addOrUpdateFromExternalRecord(flowKey, record, isIPv4)
-		return
+		fmt.Println("correlation required")
+		if !a.CacheIfNew(record) {
+			record = a.CorrelateExternal(record)
+		} else {
+			return
+		}
 	}
 
 	correlationRequired := isCorrelationRequired(record)
@@ -1062,4 +1066,20 @@ func (a *aggregationProcess) CacheIfNew(flow *flowpb.Flow) bool {
 		return true
 	}
 	return false
+}
+
+// Return a correlated flow from the given flow and it's matching record from the cache
+func (a *aggregationProcess) CorrelateExternal(flow *flowpb.Flow) *flowpb.Flow {
+	key := a.generateFromExternalCacheKey(flow)
+	cachedFlow, exists := a.FromExternalCache[key]
+	if !exists {
+		return nil
+	}
+	if a.IsGateway(flow.Ip.Source) {
+		flow.Ip.Source = cachedFlow.Ip.Source
+		return flow
+	} else {
+		cachedFlow.Ip.Source = flow.Ip.Source
+		return cachedFlow
+	}
 }
