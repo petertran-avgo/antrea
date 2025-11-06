@@ -513,11 +513,12 @@ func (a *aggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record *fl
 	defer a.mutex.Unlock()
 
 	if a.FromExternalCorrelationRequired(record) {
-		if !a.CacheIfNew(record) {
+		// Cache the record if not yet ready for correlation and return. Otherwise, pass through the correlated record
+		if a.CacheIfNew(record) {
+			return
+		} else {
 			record = a.CorrelateExternal(record)
 			flowKey, _ = getFlowKeyFromRecord(record)
-		} else {
-			return
 		}
 	}
 
