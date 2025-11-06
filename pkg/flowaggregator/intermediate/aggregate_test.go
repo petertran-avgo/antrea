@@ -413,11 +413,6 @@ var sourceNodeIP = &flowpb.IP{
 	Source:      []byte{0xac, 0x12, 0x00, 0x01}, // 172.12.18.01 // TODO pull this into const
 	Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
 }
-var sampleTransport = &flowpb.Transport{
-	ProtocolNumber:  6,
-	SourcePort:      50634,
-	DestinationPort: 80,
-}
 
 var sourceNodeStats = &flowpb.Stats{
 	PacketTotalCount: sourceNodePackets,
@@ -428,15 +423,21 @@ func generateSourceNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 	sourceNodeRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
 			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
-			DestinationServicePortName: "incomplete-service-name",
+			DestinationServicePortName: "service-name",
 		},
-		Ip:           sourceNodeIP,
-		Transport:    sampleTransport,
-		Stats:        sourceNodeStats,
-		ReverseStats: &flowpb.Stats{},
-		StartTs:      sourceNodeStart,
-		EndTs:        sourceNodeEnd,
-		Zone:         0,
+		Ip: sourceNodeIP,
+		Transport: &flowpb.Transport{
+			ProtocolNumber:  6,
+			SourcePort:      38746,
+			DestinationPort: 80,
+		},
+		Stats:                   sourceNodeStats,
+		ReverseStats:            &flowpb.Stats{},
+		StartTs:                 sourceNodeStart,
+		EndTs:                   sourceNodeEnd,
+		Zone:                    0,
+		ReplyDestinationAddress: []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
+		ReplyDestinationPort:    uint32(52391),
 	}
 	sourceNodeFlowKey, _ := getFlowKeyFromRecord(sourceNodeRecord)
 	return sourceNodeRecord, sourceNodeFlowKey
@@ -454,7 +455,11 @@ func generateDestinationNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 			Source:      []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
 			Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
 		},
-		Transport: sampleTransport,
+		Transport: &flowpb.Transport{
+			ProtocolNumber:  6,
+			SourcePort:      52391,
+			DestinationPort: 80,
+		},
 		Stats: &flowpb.Stats{
 			PacketTotalCount: destinationNodePackets,
 			OctetTotalCount:  octetTotalCount,
@@ -463,8 +468,8 @@ func generateDestinationNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 		StartTs:                 destinationNodeStart,
 		EndTs:                   destinationNodeEnd,
 		Zone:                    65520,
-		ReplyDestinationAddress: []byte{0xac, 0x12, 0x00, 0x01}, // 172.12.18.01 // TODO pull this into const
-		ReplyDestinationPort:    uint32(50634),
+		ReplyDestinationAddress: []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
+		ReplyDestinationPort:    uint32(52391),
 	}
 	destinationNodeFlowKey, _ := getFlowKeyFromRecord(destinationNodeRecord)
 	return destinationNodeRecord, destinationNodeFlowKey

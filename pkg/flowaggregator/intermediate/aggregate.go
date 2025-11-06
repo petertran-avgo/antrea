@@ -1043,19 +1043,27 @@ func (a *aggregationProcess) FromExternalCorrelationRequired(flow *flowpb.Flow) 
 // Return a key unique to the pair of flows that make up a FromExternal flow
 func (a *aggregationProcess) generateFromExternalCacheKey(record *flowpb.Flow) string {
 	var gateway string
-	var gatewayPort string
+	var SNATPort string
+
 	if a.IsGateway(record.Ip.Source) {
-		gateway = flowrecord.IpAddressAsString(record.ReplyDestinationAddress)
-		gatewayPort = strconv.FormatUint(uint64(record.ReplyDestinationPort), 10)
-	} else {
+		// Is Destination Flow
 		gateway = flowrecord.IpAddressAsString(record.Ip.Source)
-		gatewayPort = strconv.FormatUint(uint64(record.Transport.SourcePort), 10)
+		SNATPort = strconv.FormatUint(uint64(record.Transport.SourcePort), 10)
+	} else {
+		// Is SourceFlow
+		gateway = flowrecord.IpAddressAsString(record.ReplyDestinationAddress)
+		SNATPort = strconv.FormatUint(uint64(record.ReplyDestinationPort), 10)
 	}
+
+	destinationAddress := flowrecord.IpAddressAsString(record.Ip.Destination)
+	destinationPort := strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
+
 	return fmt.Sprintf("%s-%s-%s-%s",
+		SNATPort,
 		gateway,
-		gatewayPort,
-		flowrecord.IpAddressAsString(record.Ip.Destination),
-		strconv.FormatUint(uint64(record.Transport.DestinationPort), 10))
+		destinationAddress,
+		destinationPort,
+	)
 }
 
 // If FromExternal flow is not yet in the cache, cache it and return true.
