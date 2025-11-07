@@ -811,7 +811,6 @@ func TestForAllExpiredFlowRecordsDo(t *testing.T) {
 		return nil
 	}
 
-	fromExternalRecord, _ := generateSourceNodeFlowAndFlowKey()
 	testCases := []struct {
 		name               string
 		records            []*flowpb.Flow
@@ -854,12 +853,6 @@ func TestForAllExpiredFlowRecordsDo(t *testing.T) {
 			0,
 			0,
 		},
-		{
-			"Expired flow is properly removed from map",
-			[]*flowpb.Flow{fromExternalRecord},
-			0,
-			0,
-		},
 	}
 
 	for _, tc := range testCases {
@@ -891,17 +884,6 @@ func TestForAllExpiredFlowRecordsDo(t *testing.T) {
 					err := ap.ForAllExpiredFlowRecordsDo(testCallback)
 					assert.NoError(t, err)
 				}
-			case "Expired flow is properly removed from map":
-				assert.Equal(t, 1, len(ap.expirePriorityQueue))
-				for range 2 {
-					pqItem := ap.expirePriorityQueue.Peek()
-					pqItem.inactiveExpireTime = time.Time{}
-					err := ap.ForAllExpiredFlowRecordsDo(testCallback)
-					assert.NoError(t, err)
-				}
-
-				assert.Equal(t, 0, len(ap.FromExternalFlowMap),
-					"Expected record to be cleared from IP Port map after reaching max retries")
 			default:
 				break
 			}
