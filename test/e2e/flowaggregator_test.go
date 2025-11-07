@@ -2012,6 +2012,11 @@ func testExternalToPodFlows(t *testing.T, data *TestData, isIPv6 bool) {
 		t.Fatalf("Failed to create service %s", nodePortService)
 	}
 
+	// Trigger FlowAggregator's ipfixExporter process to start
+	createExternalToPodConnection(t, service, 0)
+	time.Sleep(time.Second * 5)
+	flushFlowsFromCollector(t, data, isIPv6)
+
 	tc := []struct {
 		node int
 	}{
@@ -2020,9 +2025,6 @@ func testExternalToPodFlows(t *testing.T, data *TestData, isIPv6 bool) {
 	for _, tc := range tc {
 		t.Run(fmt.Sprintf("Testing on node %v", tc.node), func(t *testing.T) {
 			sourceIP, _ := createExternalToPodConnection(t, service, tc.node)
-			fmt.Println("Waiting for ipfix to process templates")
-			time.Sleep(time.Minute)
-			sourceIP, _ = createExternalToPodConnection(t, service, tc.node)
 
 			testFlow1 := testFlow{
 				dstPodName: nginxPodName,
@@ -2035,16 +2037,11 @@ func testExternalToPodFlows(t *testing.T, data *TestData, isIPv6 bool) {
 				testFlow1.dstIP = nginxIP.IPv6.String()
 			}
 			records := getCollectorOutput(t, testFlow1.srcIP, testFlow1.dstIP, "", false, false, isIPv6, data, "", getCollectorOutputDefaultTimeout)
-			//records := getCollectorOutput(t, testFlow1.srcIP, testFlow1.dstIP, sourcePort, false, false, isIPv6, data, "", getCollectorOutputDefaultTimeout)
 			assert.NotEmpty(t, records, "Expected flows from ipfix collector to include source IP %s and destination ip %s", testFlow1.srcIP, testFlow1.dstIP)
 			for _, record := range records {
 				assert := assert.New(t)
 				assert.Contains(record, testFlow1.dstPodName, "Aggregated Record does not have Source Pod name: %s", testFlow1.srcPodName)
-				//assert.Contains(record, fmt.Sprintf("sourcePodNamespace: %s", data.testNamespace), "Record does not have correct sourcePodNamespace: %s", data.testNamespace)
-				//assert.Contains(record, fmt.Sprintf("sourceNodeName: %s", nodeName), "Record does not have correct sourceNodeName: %s", nodeName)
-				//assert.Contains(record, "\"flowexportertest\":\"l7\"", "Record does not have correct label for source Pod")
 
-				//checkL7FlowExporterData(t, record, "http")
 			}
 			flushFlowsFromCollector(t, data, isIPv6)
 		})
