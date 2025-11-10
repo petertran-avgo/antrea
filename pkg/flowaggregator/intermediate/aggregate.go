@@ -1077,13 +1077,16 @@ func (a *aggregationProcess) CacheIfNew(flow *flowpb.Flow) bool {
 	return false
 }
 
-// Return a correlated flow from the given flow and it's matching record from the cache
+// Return a correlated flow from the given flow and it's matching record from the cache. Returns
+// nil if there was no matching flow in cache. Upon successful correlation, delete the flow from
+// the cache.
 func (a *aggregationProcess) CorrelateExternal(flow *flowpb.Flow) *flowpb.Flow {
 	key := a.generateFromExternalCacheKey(flow)
 	cachedFlow, exists := a.FromExternalCache[key]
 	if !exists {
 		return nil
 	}
+	delete(a.FromExternalCache, key)
 	if a.IsGateway(flow.Ip.Source) {
 		flow.Ip.Source = cachedFlow.Ip.Source
 		return flow

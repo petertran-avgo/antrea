@@ -566,6 +566,10 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		_, exists = ap.flowKeyRecordMap[*flowKey]
 		assert.True(t, exists, "Expected correlated flow to be added to flowKeyRecordMap")
 		assert.True(t, item.flowRecord.ReadyToSend, "Expected correlated flow to be marked ready to send for export")
+
+		// Ensure cleanup
+		flow := ap.CorrelateExternal(destinationNodeRecord)
+		assert.Nil(t, flow, "Expected flow to have been cleared from cache")
 	})
 	t.Run("destination node flow arrives first", func(t *testing.T) {
 		ap := newAggregationProcess()
@@ -592,6 +596,10 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		_, exists = ap.flowKeyRecordMap[*flowKey]
 		assert.True(t, exists, "Expected correlated flow to be added to flowKeyRecordMap")
 		assert.True(t, item.flowRecord.ReadyToSend, "Expected correlated flow to be marked ready to send for export")
+
+		// Ensure cleanup
+		flow := ap.CorrelateExternal(sourceNodeRecord)
+		assert.Nil(t, flow, "Expected flow to have been cleared from cache")
 	})
 }
 
