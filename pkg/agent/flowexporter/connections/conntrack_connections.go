@@ -172,6 +172,7 @@ func (cs *ConntrackConnectionStore) Poll() ([]int, error) {
 				if err := cs.deleteConnWithoutLock(key); err != nil {
 					return err
 				}
+				cs.zoneZeroCache.Delete(conn)
 			}
 		} else {
 			conn.IsPresent = false
@@ -439,4 +440,17 @@ func CorrelateExternal(zoneZero, antreaZone *connection.Connection) {
 	antreaZone.FlowKey.SourceAddress = zoneZero.FlowKey.SourceAddress
 	antreaZone.ReplyDestinationAddress = zoneZero.ReplyDestinationAddress
 	antreaZone.ReplyDestinationPort = zoneZero.ReplyDestinationPort
+}
+
+// Given a connection key, delete it from the cache. Log an error
+// if it didn't exist in the cache
+func (c ZoneZeroCache) Delete(conn *connection.Connection) {
+	destinationAddress := conn.FlowKey.DestinationAddress
+	zoneZeroReplyDestinationPort := strconv.FormatUint(uint64(conn.ReplyDestinationPort), 10)
+
+	key := fmt.Sprintf("%s-%s", destinationAddress, zoneZeroReplyDestinationPort)
+	if _, ok := c.cache[key]; !ok {
+		klog.V(5).InfoS("Delete connection from ZoneZeroCache failed. Did not exist.", "conn", conn)
+	}
+	delete(c.cache, key)
 }
