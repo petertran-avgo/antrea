@@ -21,7 +21,6 @@ import (
 	"net"
 	"net/netip"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -146,25 +145,6 @@ func (a *aggregationProcess) GetNumFlows() int64 {
 func (a *aggregationProcess) aggregateRecordByFlowKey(record *flowpb.Flow) error {
 	flowKey, isIPv4 := getFlowKeyFromRecord(record)
 	a.addOrUpdateRecordInMap(flowKey, record, isIPv4)
-	return nil
-}
-
-// Given a priority queue item, delete it's key references from
-// the corresponding map used for correlation
-func (a *aggregationProcess) deleteKeyFromMap(pqItem *ItemToExpire) error {
-	if pqItem.isFromExternal {
-		return a.deleteFromFromExternalMap(pqItem.flowRecord.Record)
-	}
-	return a.deleteFlowKeyFromMapWithoutLock(*pqItem.flowKey)
-}
-
-func (a *aggregationProcess) deleteFromFromExternalMap(record *flowpb.Flow) error {
-	key := generateFromExternalMapKey(record)
-	_, exists := a.FromExternalFlowMap[key]
-	if !exists {
-		return fmt.Errorf("key %v is not present in the IPPortMap", key)
-	}
-	delete(a.FromExternalFlowMap, key)
 	return nil
 }
 
@@ -315,7 +295,7 @@ func (a *aggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMa
 			pqItem.flowRecord.waitForReadyToSendRetries = pqItem.flowRecord.waitForReadyToSendRetries + 1
 			if pqItem.flowRecord.waitForReadyToSendRetries > MaxRetries {
 				klog.V(2).Infof("Deleting the record after waiting for ready to send with key: %v record: %v", pqItem.flowKey, pqItem.flowRecord)
-				if err := a.deleteKeyFromMap(pqItem); err != nil {
+				if err := a.deleteFlowKeyFromMapWithoutLock(*pqItem.flowKey); err != nil {
 					return fmt.Errorf("error while deleting flow record after max retries: %v", err)
 				}
 			} else {
@@ -331,7 +311,7 @@ func (a *aggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMa
 		}
 		// Delete the flow record if it is expired because of inactive expiry timeout.
 		if pqItem.inactiveExpireTime.Before(currTime) {
-			if err := a.deleteKeyFromMap(pqItem); err != nil {
+			if err := a.deleteFlowKeyFromMapWithoutLock(*pqItem.flowKey); err != nil {
 				return fmt.Errorf("error while deleting flow record after inactive expiry: %v", err)
 			}
 			continue
@@ -367,13 +347,6 @@ func (a *aggregationProcess) IsAggregatedRecordIPv4(record AggregationFlowRecord
 	return record.isIPv4
 }
 
-// isSourceNodeRecord takes records with FlowType FromExternal and returns true
-// if the record is from the original source by means of inspecting the
-// destination pod information which cannot be populated for such records
-func isSourceNodeRecord(record *flowpb.Flow) bool {
-	return record.Zone == 0
-}
-
 // isSourceInternal turns true if the source IP address is on the
 // internal network for either IPv4 or IPv6 addresses
 func isSourceInternal(record *flowpb.Flow) bool {
@@ -392,118 +365,6 @@ func isSourceInternal(record *flowpb.Flow) bool {
 		return ip6[0] == 0xfd
 	}
 	return false
-}
-
-// Return a key unique to the given record composed of the ReplyDestinationAddress,
-// ReplyDestinationPort, destination IP and destination port to be used in FromExternalFlowMap
-// to correlate the sourceNode and destinationNode records that make up a FromExternal flow
-func generateFromExternalMapKey(record *flowpb.Flow) string {
-	var gateway string
-	var gatewayPort string
-	if isSourceNodeRecord(record) {
-		gateway = flowrecord.IpAddressAsString(record.ReplyDestinationAddress)
-		gatewayPort = strconv.FormatUint(uint64(record.ReplyDestinationPort), 10)
-	} else {
-		gateway = flowrecord.IpAddressAsString(record.Ip.Source)
-		gatewayPort = strconv.FormatUint(uint64(record.Transport.SourcePort), 10)
-	}
-	return fmt.Sprintf("%s-%s-%s-%s",
-		gateway,
-		gatewayPort,
-		flowrecord.IpAddressAsString(record.Ip.Destination),
-		strconv.FormatUint(uint64(record.Transport.DestinationPort), 10))
-}
-
-// Given a record with flowtype FromExternal, adds it to the prioirty queue with corresponding stats filled.
-// If correlation is required the record is populated with the right stats and the external source IP.
-func (a *aggregationProcess) addOrUpdateFromExternalRecord(flowKey *FlowKey, record *flowpb.Flow, isIPv4 bool) {
-	if strings.Contains(record.K8S.DestinationServicePortName, "my-app") {
-		klog.InfoS("qqq - received fromExternal record", "record", record)
-	}
-	currTime := a.clock.Now()
-	addToQueue := func(readyToSend bool) *AggregationFlowRecord {
-		aggregationRecord := &AggregationFlowRecord{
-			Record:                    record,
-			ReadyToSend:               readyToSend,
-			waitForReadyToSendRetries: 0,
-			isIPv4:                    isIPv4,
-		}
-
-		pqItem := &ItemToExpire{
-			flowKey:            flowKey,
-			isFromExternal:     true,
-			activeExpireTime:   currTime.Add(a.activeExpiryTimeout),
-			inactiveExpireTime: currTime.Add(a.inactiveExpiryTimeout),
-			flowRecord:         aggregationRecord,
-		}
-		heap.Push(&a.expirePriorityQueue, pqItem)
-		return aggregationRecord
-	}
-
-	key := generateFromExternalMapKey(record)
-	stash, exists := a.FromExternalFlowMap[key]
-
-	stashSourceNodeRecord := func() {
-		record.Aggregation = &flowpb.Aggregation{}
-		aggregationRecord := addToQueue(false)
-
-		if strings.Contains(record.K8S.DestinationServicePortName, "my-app") {
-			klog.InfoS("qqq - stashing source record", "record", record)
-		}
-		a.FromExternalFlowMap[key] = &FromExternalFlowStash{SourceNodeFlow: aggregationRecord}
-	}
-	stashDestinationNodeRecordWithStats := func() {
-		record.Aggregation = &flowpb.Aggregation{}
-		addFieldsForStatsAggregation(record, false, true)
-		a.addFieldsForThroughputCalculation(record, record, false, true)
-		if strings.Contains(record.K8S.DestinationServicePortName, "my-app") {
-			klog.InfoS("qqq - stashing destination record", "record", record)
-		}
-		aggregationRecord := addToQueue(false)
-		a.FromExternalFlowMap[key] = &FromExternalFlowStash{DestinationNodeFlow: aggregationRecord}
-	}
-	correlateDestinationNodeRecord := func() {
-		if stash.DestinationNodeFlow != nil {
-			aggregationRecord := stash.DestinationNodeFlow
-			aggregationRecord.Record.Ip.Source = record.Ip.Source
-
-			copyStats(record.Stats, aggregationRecord.Record.Aggregation.StatsFromSource)
-			a.addFieldsForThroughputCalculation(record, aggregationRecord.Record, true, false)
-			if strings.Contains(record.K8S.DestinationServicePortName, "my-app") {
-				klog.InfoS("qqq - compelted correlation of record (source node came second). adding to queue for export", "aggrecord", aggregationRecord)
-			}
-			aggregationRecord.ReadyToSend = true // maybe this hsould be the last step? yes probably but it isnt the crux of hte problem. the source ip is not overwritten in the e2es
-		}
-	}
-	correlateRecordWithStats := func() {
-		if stash.SourceNodeFlow != nil {
-			stashedRecord := stash.SourceNodeFlow.Record
-			record.Ip.Source = stashedRecord.Ip.Source
-			record.Aggregation = &flowpb.Aggregation{}
-			copyFieldsForStatsAggregation(stashedRecord, record, true, false)
-			copyStats(record.Stats, record.Aggregation.StatsFromDestination)
-			a.addFieldsForThroughputCalculation(stashedRecord, record, true, false)
-			a.addFieldsForThroughputCalculation(record, record, false, true)
-			if strings.Contains(record.K8S.DestinationServicePortName, "my-app") {
-				klog.InfoS("qqq - completed correlation of record (destination record came second). adding to queue for export", "record", record)
-			}
-			addToQueue(true)
-		}
-	}
-
-	if !exists {
-		if isSourceNodeRecord(record) {
-			stashSourceNodeRecord()
-		} else {
-			stashDestinationNodeRecordWithStats()
-		}
-	} else {
-		if isSourceNodeRecord(record) {
-			correlateDestinationNodeRecord()
-		} else {
-			correlateRecordWithStats()
-		}
-	}
 }
 
 // addOrUpdateRecordInMap either adds the record to flowKeyMap or updates the record in
