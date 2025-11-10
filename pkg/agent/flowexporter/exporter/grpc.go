@@ -150,9 +150,8 @@ func (e *grpcExporter) createMessage(conn *connection.Connection) *flowpb.Flow {
 			ProtocolName: conn.AppProtocolName,
 			HttpVals:     []byte(conn.HttpVals),
 		},
-		Zone:                    uint32(conn.Zone),
-		ReplyDestinationAddress: conn.ReplyDestinationAddress.AsSlice(),
-		ReplyDestinationPort:    uint32(conn.ReplyDestinationPort),
+		ReplyDestinationAddress: conn.ProxySnatIP.AsSlice(),
+		ReplyDestinationPort:    uint32(conn.ProxySnatPort),
 	}
 	if utils.IsConnectionDying(conn) {
 		flow.EndReason = flowpb.FlowEndReason_FLOW_END_REASON_END_OF_FLOW

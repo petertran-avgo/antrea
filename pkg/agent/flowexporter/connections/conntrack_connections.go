@@ -396,7 +396,7 @@ type ZoneZeroCache struct {
 // but can also be derived for the matching antrea ct_zone record.
 func (c ZoneZeroCache) generateKey(conn *connection.Connection) string {
 	destinationAddress := conn.FlowKey.DestinationAddress.String()
-	replyDestinationPort := strconv.FormatUint(uint64(conn.ReplyDestinationPort), 10)
+	replyDestinationPort := strconv.FormatUint(uint64(conn.ProxySnatPort), 10)
 	return fmt.Sprintf("%s-%s", destinationAddress, replyDestinationPort)
 }
 
@@ -438,15 +438,15 @@ func (c ZoneZeroCache) GetMatching(conn *connection.Connection) *connection.Conn
 func CorrelateExternal(zoneZero, antreaZone *connection.Connection) {
 	antreaZone.FlowKey.SourcePort = zoneZero.FlowKey.SourcePort
 	antreaZone.FlowKey.SourceAddress = zoneZero.FlowKey.SourceAddress
-	antreaZone.ReplyDestinationAddress = zoneZero.ReplyDestinationAddress
-	antreaZone.ReplyDestinationPort = zoneZero.ReplyDestinationPort
+	antreaZone.ProxySnatIP = zoneZero.ProxySnatIP
+	antreaZone.ProxySnatPort = zoneZero.ProxySnatPort
 }
 
 // Given a connection key, delete it from the cache. Log an error
 // if it didn't exist in the cache
 func (c ZoneZeroCache) Delete(conn *connection.Connection) {
 	destinationAddress := conn.FlowKey.DestinationAddress
-	zoneZeroReplyDestinationPort := strconv.FormatUint(uint64(conn.ReplyDestinationPort), 10)
+	zoneZeroReplyDestinationPort := strconv.FormatUint(uint64(conn.ProxySnatPort), 10)
 
 	key := fmt.Sprintf("%s-%s", destinationAddress, zoneZeroReplyDestinationPort)
 	if _, ok := c.cache[key]; !ok {

@@ -309,9 +309,9 @@ func TestConntrackConnectionStore_AddOrUpdateConn_FromExternalConns(t *testing.T
 					Protocol:           6,
 					SourcePort:         52142,
 					DestinationPort:    80},
-				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
-				ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
-				ReplyDestinationPort:    uint16(28392),
+				Mark:          openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				ProxySnatIP:   netip.MustParseAddr("172.18.0.2"),
+				ProxySnatPort: uint16(28392),
 			},
 			newConn: connection.Connection{
 				StartTime:      refTime.Add(-(time.Second * 50)),
@@ -323,12 +323,12 @@ func TestConntrackConnectionStore_AddOrUpdateConn_FromExternalConns(t *testing.T
 					Protocol:           6,
 					SourcePort:         28392,
 					DestinationPort:    80},
-				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
-				Labels:                  []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
-				ReplyDestinationAddress: netip.MustParseAddr("10.244.2.1"),
-				ReplyDestinationPort:    uint16(28392),
-				Zone:                    65520,
-				OriginalPackets:         0xfff,
+				Mark:            openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				Labels:          []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
+				ProxySnatIP:     netip.MustParseAddr("10.244.2.1"),
+				ProxySnatPort:   uint16(28392),
+				Zone:            65520,
+				OriginalPackets: 0xfff,
 			},
 			updatedConn: connection.Connection{
 				StartTime: refTime,
@@ -339,12 +339,12 @@ func TestConntrackConnectionStore_AddOrUpdateConn_FromExternalConns(t *testing.T
 					Protocol:           6,
 					SourcePort:         28392,
 					DestinationPort:    80},
-				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
-				Labels:                  []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
-				ReplyDestinationAddress: netip.MustParseAddr("10.244.2.1"),
-				ReplyDestinationPort:    uint16(28392),
-				Zone:                    65520,
-				OriginalPackets:         0xffff,
+				Mark:            openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				Labels:          []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
+				ProxySnatIP:     netip.MustParseAddr("10.244.2.1"),
+				ProxySnatPort:   uint16(28392),
+				Zone:            65520,
+				OriginalPackets: 0xffff,
 			},
 			expectedConn: connection.Connection{
 				StartTime:      refTime.Add(-(time.Second * 50)),
@@ -373,8 +373,8 @@ func TestConntrackConnectionStore_AddOrUpdateConn_FromExternalConns(t *testing.T
 				OriginalPackets:                0xfff,
 				// TODO destinationServiceIPv4 == node ip
 				// destinationServicePort == NodePort
-				ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
-				ReplyDestinationPort:    uint16(28392),
+				ProxySnatIP:   netip.MustParseAddr("172.18.0.2"),
+				ProxySnatPort: uint16(28392),
 			},
 			expectedUpdatedConn: connection.Connection{
 				StartTime:      refTime.Add(-(time.Second * 50)),
@@ -403,8 +403,8 @@ func TestConntrackConnectionStore_AddOrUpdateConn_FromExternalConns(t *testing.T
 				OriginalPackets:                0xffff,
 				// TODO destinationServiceIPv4 == node ip
 				// destinationServicePort == NodePort
-				ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
-				ReplyDestinationPort:    uint16(28392),
+				ProxySnatIP:   netip.MustParseAddr("172.18.0.2"),
+				ProxySnatPort: uint16(28392),
 			},
 		},
 	}
@@ -536,9 +536,9 @@ func TestZoneZeroCache_Delete(t *testing.T) {
 			Protocol:           6,
 			SourcePort:         52142,
 			DestinationPort:    80},
-		Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
-		ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
-		ReplyDestinationPort:    uint16(28392),
+		Mark:          openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+		ProxySnatIP:   netip.MustParseAddr("172.18.0.2"),
+		ProxySnatPort: uint16(28392),
 	}
 	newConn := connection.Connection{
 		StartTime:      refTime.Add(-(time.Second * 50)),
@@ -550,12 +550,12 @@ func TestZoneZeroCache_Delete(t *testing.T) {
 			Protocol:           6,
 			SourcePort:         28392,
 			DestinationPort:    80},
-		Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
-		Labels:                  []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
-		ReplyDestinationAddress: netip.MustParseAddr("10.244.2.1"),
-		ReplyDestinationPort:    uint16(28392),
-		Zone:                    65520,
-		OriginalPackets:         0xfff,
+		Mark:            openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+		Labels:          []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
+		ProxySnatIP:     netip.MustParseAddr("10.244.2.1"),
+		ProxySnatPort:   uint16(28392),
+		Zone:            65520,
+		OriginalPackets: 0xfff,
 	}
 	expectedConn := connection.Connection{
 		StartTime:      refTime.Add(-(time.Second * 50)),
@@ -584,8 +584,8 @@ func TestZoneZeroCache_Delete(t *testing.T) {
 		OriginalPackets:                0xfff,
 		// TODO destinationServiceIPv4 == node ip
 		// destinationServicePort == NodePort
-		ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
-		ReplyDestinationPort:    uint16(28392),
+		ProxySnatIP:   netip.MustParseAddr("172.18.0.2"),
+		ProxySnatPort: uint16(28392),
 	}
 
 	ctrl := gomock.NewController(t)
@@ -787,9 +787,9 @@ func TestZoneZeroCache(t *testing.T) {
 					Protocol:           6,
 					SourcePort:         52142,
 					DestinationPort:    80},
-				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
-				ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
-				ReplyDestinationPort:    uint16(28392),
+				Mark:          openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				ProxySnatIP:   netip.MustParseAddr("172.18.0.2"),
+				ProxySnatPort: uint16(28392),
 			}
 			err := cache.Add(zoneZeroConn)
 			assert.Nil(t, err, "Expected adding zone 0 connection to not error")
@@ -807,10 +807,10 @@ func TestZoneZeroCache(t *testing.T) {
 					Protocol:           6,
 					SourcePort:         52142,
 					DestinationPort:    80},
-				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
-				ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
-				ReplyDestinationPort:    uint16(28392),
-				Zone:                    123,
+				Mark:          openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				ProxySnatIP:   netip.MustParseAddr("172.18.0.2"),
+				ProxySnatPort: uint16(28392),
+				Zone:          123,
 			}
 			assert.Error(t, cache.Add(zoneZeroConn), "Expected an error adding connection with zone 123")
 		})
@@ -828,9 +828,9 @@ func TestZoneZeroCache(t *testing.T) {
 					Protocol:           6,
 					SourcePort:         52142,
 					DestinationPort:    80},
-				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
-				ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
-				ReplyDestinationPort:    uint16(28392),
+				Mark:          openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				ProxySnatIP:   netip.MustParseAddr("172.18.0.2"),
+				ProxySnatPort: uint16(28392),
 			}
 			antreaZeroConn := &connection.Connection{
 				StartTime: refTime,
@@ -841,9 +841,9 @@ func TestZoneZeroCache(t *testing.T) {
 					Protocol:           6,
 					SourcePort:         28392,
 					DestinationPort:    80},
-				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
-				ReplyDestinationAddress: netip.MustParseAddr("10.244.2.1"),
-				ReplyDestinationPort:    uint16(28392),
+				Mark:          openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				ProxySnatIP:   netip.MustParseAddr("10.244.2.1"),
+				ProxySnatPort: uint16(28392),
 			}
 			cache.Add(zoneZeroConn)
 			match := cache.GetMatching(antreaZeroConn)
@@ -862,9 +862,9 @@ func TestZoneZeroCache(t *testing.T) {
 					Protocol:           6,
 					SourcePort:         52142,
 					DestinationPort:    80},
-				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
-				ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
-				ReplyDestinationPort:    uint16(28392),
+				Mark:          openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				ProxySnatIP:   netip.MustParseAddr("172.18.0.2"),
+				ProxySnatPort: uint16(28392),
 			}
 			antreaZeroConn := &connection.Connection{
 				StartTime: refTime,
@@ -875,9 +875,9 @@ func TestZoneZeroCache(t *testing.T) {
 					Protocol:           6,
 					SourcePort:         55555,
 					DestinationPort:    80},
-				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
-				ReplyDestinationAddress: netip.MustParseAddr("10.244.2.1"),
-				ReplyDestinationPort:    uint16(28392),
+				Mark:          openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				ProxySnatIP:   netip.MustParseAddr("10.244.2.1"),
+				ProxySnatPort: uint16(28392),
 			}
 			cache.Add(zoneZeroConn)
 			match := cache.GetMatching(antreaZeroConn)
@@ -897,9 +897,9 @@ func TestZoneZeroCache(t *testing.T) {
 					Protocol:           6,
 					SourcePort:         52142,
 					DestinationPort:    80},
-				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
-				ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
-				ReplyDestinationPort:    uint16(28392),
+				Mark:          openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				ProxySnatIP:   netip.MustParseAddr("172.18.0.2"),
+				ProxySnatPort: uint16(28392),
 			}
 			cache.Add(zoneZeroConn)
 			assert.True(t, cache.Contains(zoneZeroConn), "Expected cache to contain previously added connection")
@@ -916,9 +916,9 @@ func TestZoneZeroCache(t *testing.T) {
 					Protocol:           6,
 					SourcePort:         52142,
 					DestinationPort:    80},
-				Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
-				ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
-				ReplyDestinationPort:    uint16(28392),
+				Mark:          openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+				ProxySnatIP:   netip.MustParseAddr("172.18.0.2"),
+				ProxySnatPort: uint16(28392),
 			}
 			assert.False(t, cache.Contains(zoneZeroConn), "Expected cache to not contain any connections")
 		})
@@ -938,9 +938,9 @@ func TestCorrelateExternal(t *testing.T) {
 				Protocol:           6,
 				SourcePort:         52142,
 				DestinationPort:    80},
-			Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
-			ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
-			ReplyDestinationPort:    uint16(28392),
+			Mark:          openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+			ProxySnatIP:   netip.MustParseAddr("172.18.0.2"),
+			ProxySnatPort: uint16(28392),
 		}
 		antreaZone := connection.Connection{
 			StartTime: refTime,
@@ -951,9 +951,9 @@ func TestCorrelateExternal(t *testing.T) {
 				Protocol:           6,
 				SourcePort:         55555,
 				DestinationPort:    80},
-			Mark:                    openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
-			ReplyDestinationAddress: netip.MustParseAddr("10.244.2.1"),
-			ReplyDestinationPort:    uint16(28392),
+			Mark:          openflow.ServiceCTMark.GetValue(), // Mark is empty from the conntrack output??
+			ProxySnatIP:   netip.MustParseAddr("10.244.2.1"),
+			ProxySnatPort: uint16(28392),
 		}
 		expected := connection.Connection{
 			StartTime: refTime,
@@ -964,9 +964,9 @@ func TestCorrelateExternal(t *testing.T) {
 				Protocol:           6,
 				SourcePort:         52142,
 				DestinationPort:    80},
-			Mark:                    openflow.ServiceCTMark.GetValue(),
-			ReplyDestinationAddress: netip.MustParseAddr("172.18.0.2"),
-			ReplyDestinationPort:    uint16(28392),
+			Mark:          openflow.ServiceCTMark.GetValue(),
+			ProxySnatIP:   netip.MustParseAddr("172.18.0.2"),
+			ProxySnatPort: uint16(28392),
 		}
 		CorrelateExternal(&zoneZero, &antreaZone)
 		assert.Equal(t, expected, antreaZone)
