@@ -392,9 +392,10 @@ func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
 
 var currTime = time.Now()
 var externalIP = []byte{0xac, 0x12, 0x00, 0x01} // 172.12.18.01
+var podIP = []byte{0x0e, 0xec, 0x01, 0x03}      // 10.244.1.3
 var sourceNodeIP = &flowpb.IP{
 	Source:      externalIP,
-	Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
+	Destination: podIP,
 }
 
 func generateSourceNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
@@ -431,7 +432,7 @@ func generateDestinationNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 		},
 		Ip: &flowpb.IP{
 			Source:      []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
-			Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
+			Destination: podIP,
 		},
 		Transport: &flowpb.Transport{
 			ProtocolNumber:  6,
