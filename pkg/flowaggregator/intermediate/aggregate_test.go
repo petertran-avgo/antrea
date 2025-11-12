@@ -391,9 +391,9 @@ func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
 }
 
 var currTime = time.Now()
-
+var externalIP = []byte{0xac, 0x12, 0x00, 0x01} // 172.12.18.01
 var sourceNodeIP = &flowpb.IP{
-	Source:      []byte{0xac, 0x12, 0x00, 0x01}, // 172.12.18.01 // TODO pull this into const
+	Source:      externalIP,
 	Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
 }
 
@@ -506,7 +506,7 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		assert.True(t, item.flowRecord.ReadyToSend, "Expected correlated flow to be marked ready to send for export")
 		correlatedFlow := record.Record
 		assert.NotNil(t, correlatedFlow, "Expected stored flow to not be nil")
-		assert.Equal(t, []byte{0xac, 0x12, 0x00, 0x01}, correlatedFlow.Ip.Source, "Expected correlated flow to have original source IP")
+		assert.Equal(t, externalIP, correlatedFlow.Ip.Source, "Expected correlated flow to have original source IP")
 		assert.Equal(t, []byte{0x0e, 0xec, 0x01, 0x03}, correlatedFlow.K8S.DestinationServiceIp, "Expected correlated flow to have node IP")
 
 		// Ensure cleanup
@@ -541,7 +541,7 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 
 		correlatedFlow := record.Record
 		assert.NotNil(t, correlatedFlow, "Expected stored flow to not be nil")
-		assert.Equal(t, []byte{0xac, 0x12, 0x00, 0x01}, correlatedFlow.Ip.Source, "Expected correlated flow to have original source IP")
+		assert.Equal(t, externalIP, correlatedFlow.Ip.Source, "Expected correlated flow to have original source IP")
 		assert.Equal(t, []byte{0x0e, 0xec, 0x01, 0x03}, correlatedFlow.K8S.DestinationServiceIp, "Expected correlated flow to have node IP")
 
 		// Ensure cleanup
@@ -971,8 +971,7 @@ func TestIsGateway(t *testing.T) {
 	t.Run("IP is not a gateway", func(t *testing.T) {
 		ap := newAggregationProcess()
 		ap.nodeLister = mockLister{}
-		ip := []byte{0xac, 0x12, 0x00, 0x01} // 172.18.0.1
-
+		ip := externalIP
 		assert.False(t, ap.IsGateway(ip), "Expected 172.18.0.1 not to be a gateway")
 	})
 }
