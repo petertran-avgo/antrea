@@ -393,6 +393,7 @@ func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
 var currTime = time.Now()
 var externalIP = []byte{0xac, 0x12, 0x00, 0x01} // 172.12.18.01
 var podIP = []byte{0x0e, 0xec, 0x01, 0x03}      // 10.244.1.3
+var gatewayIP = []byte{0x0a, 0xf4, 0x02, 0x01}  // 10.244.2.1
 var sourceNodeIP = &flowpb.IP{
 	Source:      externalIP,
 	Destination: podIP,
@@ -403,7 +404,7 @@ func generateSourceNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 		K8S: &flowpb.Kubernetes{
 			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
 			DestinationServicePortName: ":serviceportname",
-			DestinationServiceIp:       []byte{0x0e, 0xec, 0x01, 0x03},
+			DestinationServiceIp:       []byte{0x0e, 0xec, 0x01, 0x03}, //TODO this should be a node IP
 		},
 		Ip: sourceNodeIP,
 		Transport: &flowpb.Transport{
@@ -415,7 +416,7 @@ func generateSourceNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 		StartTs:       timestamppb.New(currTime),
 		EndTs:         timestamppb.New(currTime.Add(time.Minute)),
 		Zone:          0,
-		ProxySnatIP:   []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
+		ProxySnatIP:   gatewayIP,
 		ProxySnatPort: uint32(52391),
 	}
 	sourceNodeFlowKey, _ := getFlowKeyFromRecord(sourceNodeRecord)
@@ -431,7 +432,7 @@ func generateDestinationNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 			DestinationServicePortName: "namespace/service-name:serviceportname",
 		},
 		Ip: &flowpb.IP{
-			Source:      []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
+			Source:      gatewayIP,
 			Destination: podIP,
 		},
 		Transport: &flowpb.Transport{
@@ -444,7 +445,7 @@ func generateDestinationNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 		StartTs:       timestamppb.New(currTime),
 		EndTs:         timestamppb.New(currTime.Add(2 * time.Minute)),
 		Zone:          65520,
-		ProxySnatIP:   []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
+		ProxySnatIP:   gatewayIP,
 		ProxySnatPort: uint32(52391),
 	}
 	destinationNodeFlowKey, _ := getFlowKeyFromRecord(destinationNodeRecord)
@@ -965,9 +966,8 @@ func TestIsGateway(t *testing.T) {
 	t.Run("IP is a node gateway", func(t *testing.T) {
 		ap := newAggregationProcess()
 		ap.nodeLister = mockLister{}
-		ip := []byte{0x0a, 0xf4, 0x02, 0x01} // 10.244.2.1
 
-		assert.True(t, ap.IsGateway(ip), "Expected 10.244.2.1 to be considered a gateway")
+		assert.True(t, ap.IsGateway(gatewayIP), "Expected 10.244.2.1 to be considered a gateway")
 	})
 	t.Run("IP is not a gateway", func(t *testing.T) {
 		ap := newAggregationProcess()
