@@ -912,8 +912,8 @@ func (a *aggregationProcess) generateFromExternalCacheKey(record *flowpb.Flow) s
 		SNATPort = strconv.FormatUint(uint64(record.Transport.SourcePort), 10)
 	} else {
 		// Is SourceFlow
-		gateway = flowrecord.IpAddressAsString(record.ReplyDestinationAddress)
-		SNATPort = strconv.FormatUint(uint64(record.ReplyDestinationPort), 10)
+		gateway = flowrecord.IpAddressAsString(record.ProxySnatIP)
+		SNATPort = strconv.FormatUint(uint64(record.ProxySnatPort), 10)
 	}
 
 	destinationAddress := flowrecord.IpAddressAsString(record.Ip.Destination)

@@ -198,6 +198,6 @@ message Flow {
   Aggregation aggregation = 13;
 
   uint32 zone = 14;
-  bytes ReplyDestinationAddress = 15;
-  uint32 ReplyDestinationPort = 16;
+  bytes ProxySnatIP = 15;
+  uint32 ProxySnatPort = 16;
 }
