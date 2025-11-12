@@ -488,43 +488,6 @@ func newAggregationProcess() *aggregationProcess {
 	return ap
 }
 
-func assertCorrelatedStats(t *testing.T, flowRecord *AggregationFlowRecord) {
-	aggregation := flowRecord.Record.Aggregation
-	assertStats(t, aggregation)
-	assert.Equal(t, destinationNodePackets, aggregation.StatsFromDestination.PacketTotalCount, "Expected StatsFromDestination to equal destinationNode's flow's stats")
-	assert.Equal(t, destinationNodeThroughPut, aggregation.ThroughputFromDestination, "Expected ThroughputFromDestination to equal destinationNode's flow's throughout")
-}
-
-func assertStats(t *testing.T, aggregation *flowpb.Aggregation) {
-	assert.NotNil(t, aggregation.StatsFromSource, "Expected StatsFromSource to be initialized for population")
-	assert.NotNil(t, aggregation.StatsFromDestination, "Expected StatsFromDestination to be initialized for population")
-	assert.Equal(t, sourceNodePackets, aggregation.StatsFromSource.PacketTotalCount, "Expected StatsFromSource values to equal sourceNode's flow's source stats")
-	assert.Equal(t, sourceNodeThroughPut, aggregation.ThroughputFromSource, "Expected ThroughputFromSource to equal sourceNode's flow's throughput")
-}
-
-func assertUncorrelatedStats(t *testing.T, flowRecord *AggregationFlowRecord) {
-	aggregation := flowRecord.Record.Aggregation
-	assertStats(t, aggregation)
-	assert.Equal(t, sourceNodePackets, aggregation.StatsFromDestination.PacketTotalCount)
-	assert.Equal(t, sourceNodeThroughPut, aggregation.ThroughputFromDestination)
-}
-
-func assertPriorityQueueRecordInitialized(t *testing.T, ap *aggregationProcess) {
-	assert.Equal(t, 1, len(ap.expirePriorityQueue))
-	recordForExport := ap.expirePriorityQueue.Peek().flowRecord
-	assert.NotNil(t, recordForExport)
-	assert.NotEmpty(t, ap.expirePriorityQueue.Peek().activeExpireTime)
-	assert.NotEmpty(t, ap.expirePriorityQueue.Peek().inactiveExpireTime)
-}
-
-func assertUpdated(t *testing.T, record *AggregationFlowRecord) {
-	assert.True(t, record.ReadyToSend)
-	assert.NotNil(t, record.Record.Aggregation)
-	assert.Equal(t, record.Record.Ip.Source, []byte{0xac, 0x12, 0x00, 0x01})  // 172.12.18.01
-	assert.Equal(t, destinationPodName, record.Record.K8S.DestinationPodName) // TODO this is may become redundant
-	assert.Equal(t, destinationServicePortName, record.Record.K8S.DestinationServicePortName)
-}
-
 // TestCorrelateRecordsForFromExternalFlow validates flows received by the FlowAggregator
 // are correctly correlated as they come from the source node and destination node
 func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
