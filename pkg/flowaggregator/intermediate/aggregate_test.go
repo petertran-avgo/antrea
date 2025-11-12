@@ -431,13 +431,13 @@ func generateSourceNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 			SourcePort:      38746,
 			DestinationPort: 80,
 		},
-		Stats:                   sourceNodeStats,
-		ReverseStats:            &flowpb.Stats{},
-		StartTs:                 sourceNodeStart,
-		EndTs:                   sourceNodeEnd,
-		Zone:                    0,
-		ReplyDestinationAddress: []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
-		ReplyDestinationPort:    uint32(52391),
+		Stats:         sourceNodeStats,
+		ReverseStats:  &flowpb.Stats{},
+		StartTs:       sourceNodeStart,
+		EndTs:         sourceNodeEnd,
+		Zone:          0,
+		ProxySnatIP:   []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
+		ProxySnatPort: uint32(52391),
 	}
 	sourceNodeFlowKey, _ := getFlowKeyFromRecord(sourceNodeRecord)
 	return sourceNodeRecord, sourceNodeFlowKey
@@ -464,12 +464,12 @@ func generateDestinationNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 			PacketTotalCount: destinationNodePackets,
 			OctetTotalCount:  octetTotalCount,
 		},
-		ReverseStats:            &flowpb.Stats{},
-		StartTs:                 destinationNodeStart,
-		EndTs:                   destinationNodeEnd,
-		Zone:                    65520,
-		ReplyDestinationAddress: []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
-		ReplyDestinationPort:    uint32(52391),
+		ReverseStats:  &flowpb.Stats{},
+		StartTs:       destinationNodeStart,
+		EndTs:         destinationNodeEnd,
+		Zone:          65520,
+		ProxySnatIP:   []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
+		ProxySnatPort: uint32(52391),
 	}
 	destinationNodeFlowKey, _ := getFlowKeyFromRecord(destinationNodeRecord)
 	return destinationNodeRecord, destinationNodeFlowKey
