@@ -390,40 +390,18 @@ func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
 	runCorrelationAndCheckResult(t, ap, clock, record1, nil, true, flowpb.FlowType_FLOW_TYPE_TO_EXTERNAL, false)
 }
 
-var destinationPodName = "nginx-deployment-HASH"
-var destinationPodNamespace = "some-namespace"
-var destinationServicePortName = "namespace/service-name:portname"
-var sourceNodePackets = uint64(1005)
-var destinationNodePackets = uint64(999)
 var currTime = time.Now()
-var sourceNodeWindow = 1 * time.Minute
-var sourceNodeStart = timestamppb.New(currTime)
-var sourceNodeEnd = timestamppb.New(currTime.Add(sourceNodeWindow))
-var octetTotalCount = uint64(2050)
-
-// TODO pull this out into a helper function
-var sourceNodeThroughPut = octetTotalCount * 8 / uint64(sourceNodeEnd.Seconds-sourceNodeStart.Seconds)
-
-var destinationNodeWindow = 2 * time.Minute
-var destinationNodeStart = timestamppb.New(currTime)
-var destinationNodeEnd = timestamppb.New(currTime.Add(destinationNodeWindow))
-var destinationNodeThroughPut = octetTotalCount * 8 / uint64(destinationNodeEnd.Seconds-destinationNodeStart.Seconds)
 
 var sourceNodeIP = &flowpb.IP{
 	Source:      []byte{0xac, 0x12, 0x00, 0x01}, // 172.12.18.01 // TODO pull this into const
 	Destination: []byte{0x0e, 0xec, 0x01, 0x03}, // 10.244.1.3
 }
 
-var sourceNodeStats = &flowpb.Stats{
-	PacketTotalCount: sourceNodePackets,
-	OctetTotalCount:  octetTotalCount,
-}
-
 func generateSourceNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 	sourceNodeRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
 			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
-			DestinationServicePortName: "service-name",
+			DestinationServicePortName: ":serviceportname",
 			DestinationServiceIp:       []byte{0x0e, 0xec, 0x01, 0x03},
 		},
 		Ip: sourceNodeIP,
@@ -432,10 +410,9 @@ func generateSourceNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 			SourcePort:      38746,
 			DestinationPort: 80,
 		},
-		Stats:         sourceNodeStats,
 		ReverseStats:  &flowpb.Stats{},
-		StartTs:       sourceNodeStart,
-		EndTs:         sourceNodeEnd,
+		StartTs:       timestamppb.New(currTime),
+		EndTs:         timestamppb.New(currTime.Add(time.Minute)),
 		Zone:          0,
 		ProxySnatIP:   []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
 		ProxySnatPort: uint32(52391),
@@ -447,10 +424,10 @@ func generateSourceNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 func generateDestinationNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 	destinationNodeRecord := &flowpb.Flow{
 		K8S: &flowpb.Kubernetes{
-			DestinationPodName:         destinationPodName,
-			DestinationPodNamespace:    destinationPodNamespace,
+			DestinationPodName:         "nginx-deployment-HASH",
+			DestinationPodNamespace:    "some-namespace",
 			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
-			DestinationServicePortName: destinationServicePortName,
+			DestinationServicePortName: "namespace/service-name:serviceportname",
 		},
 		Ip: &flowpb.IP{
 			Source:      []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
@@ -461,13 +438,10 @@ func generateDestinationNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 			SourcePort:      52391,
 			DestinationPort: 80,
 		},
-		Stats: &flowpb.Stats{
-			PacketTotalCount: destinationNodePackets,
-			OctetTotalCount:  octetTotalCount,
-		},
+		Stats:         &flowpb.Stats{},
 		ReverseStats:  &flowpb.Stats{},
-		StartTs:       destinationNodeStart,
-		EndTs:         destinationNodeEnd,
+		StartTs:       timestamppb.New(currTime),
+		EndTs:         timestamppb.New(currTime.Add(2 * time.Minute)),
 		Zone:          65520,
 		ProxySnatIP:   []byte{0x0a, 0xf4, 0x02, 0x01}, // 10.244.2.1
 		ProxySnatPort: uint32(52391),
