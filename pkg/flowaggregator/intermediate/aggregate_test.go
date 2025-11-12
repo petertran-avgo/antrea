@@ -463,6 +463,7 @@ func newAggregationProcess() *aggregationProcess {
 	}
 	clock := clocktesting.NewFakeClock(time.Now())
 	ap, _ := initAggregationProcessWithClock(input, clock, nil)
+	ap.nodeLister = mockLister{}
 	return ap
 }
 
@@ -471,7 +472,6 @@ func newAggregationProcess() *aggregationProcess {
 func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 	t.Run("correlation not required", func(t *testing.T) {
 		ap := newAggregationProcess()
-		ap.nodeLister = mockLister{}
 
 		// Build a correlated record
 		destinationNodeRecord, _ := generateDestinationNodeFlowAndFlowKey()
@@ -484,7 +484,6 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 	})
 	t.Run("source node flow arrives first", func(t *testing.T) {
 		ap := newAggregationProcess()
-		ap.nodeLister = mockLister{}
 
 		// Add the sourceNodeFlow
 		sourceNodeRecord, sourceNodeRecordFlowKey := generateSourceNodeFlowAndFlowKey()
@@ -518,7 +517,6 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 	})
 	t.Run("destination node flow arrives first", func(t *testing.T) {
 		ap := newAggregationProcess()
-		ap.nodeLister = mockLister{}
 
 		// Add the destinationNodeFlow
 		destinationNodeRecord, destinationNodeRecordFlowKey := generateDestinationNodeFlowAndFlowKey()
@@ -966,13 +964,11 @@ func (m mockLister) Get(name string) (*corev1.Node, error) {
 func TestIsGateway(t *testing.T) {
 	t.Run("IP is a node gateway", func(t *testing.T) {
 		ap := newAggregationProcess()
-		ap.nodeLister = mockLister{}
 
 		assert.True(t, ap.IsGateway(gatewayIP), "Expected 10.244.2.1 to be considered a gateway")
 	})
 	t.Run("IP is not a gateway", func(t *testing.T) {
 		ap := newAggregationProcess()
-		ap.nodeLister = mockLister{}
 		ip := externalIP
 		assert.False(t, ap.IsGateway(ip), "Expected 172.18.0.1 not to be a gateway")
 	})
@@ -996,13 +992,11 @@ func TestFromExternalCorrelationRequired(t *testing.T) {
 	t.Run("Given a destinationNode flow", func(t *testing.T) {
 		destinationNodeFlow, _ := generateDestinationNodeFlowAndFlowKey()
 		ap := newAggregationProcess()
-		ap.nodeLister = mockLister{}
 		assert.True(t, ap.FromExternalCorrelationRequired(destinationNodeFlow))
 	})
 	t.Run("Given a sourceNode flow", func(t *testing.T) {
 		sourceNodeFlow, _ := generateSourceNodeFlowAndFlowKey()
 		ap := newAggregationProcess()
-		ap.nodeLister = mockLister{}
 		assert.True(t, ap.FromExternalCorrelationRequired(sourceNodeFlow))
 	})
 }
@@ -1010,7 +1004,6 @@ func TestFromExternalCorrelationRequired(t *testing.T) {
 func TestCacheIfNew(t *testing.T) {
 	t.Run("cache", func(t *testing.T) {
 		ap := newAggregationProcess()
-		ap.nodeLister = mockLister{}
 		sourceNodeFlow, _ := generateSourceNodeFlowAndFlowKey()
 		isCached := ap.CacheIfNew(sourceNodeFlow)
 		assert.True(t, isCached, "Expected not to find flow in an empty cache")
@@ -1021,7 +1014,6 @@ func TestCacheIfNew(t *testing.T) {
 	})
 	t.Run("already in cache", func(t *testing.T) {
 		ap := newAggregationProcess()
-		ap.nodeLister = mockLister{}
 		sourceNodeFlow, _ := generateSourceNodeFlowAndFlowKey()
 		destinationNodeFlow, _ := generateDestinationNodeFlowAndFlowKey()
 		ap.CacheIfNew(sourceNodeFlow)
