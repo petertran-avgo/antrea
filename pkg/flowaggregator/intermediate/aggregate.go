@@ -950,9 +950,15 @@ func (a *aggregationProcess) CorrelateExternal(flow *flowpb.Flow) *flowpb.Flow {
 	delete(a.FromExternalCache, key)
 	if a.IsGateway(flow.Ip.Source) {
 		flow.Ip.Source = cachedFlow.Ip.Source
+		if flow.K8S != nil {
+			flow.K8S.DestinationServiceIp = cachedFlow.K8S.DestinationServiceIp
+		}
 		return flow
 	} else {
 		cachedFlow.Ip.Source = flow.Ip.Source
+		if cachedFlow.K8S != nil {
+			cachedFlow.K8S.DestinationServiceIp = flow.K8S.DestinationServiceIp
+		}
 		return cachedFlow
 	}
 }

@@ -424,6 +424,7 @@ func generateSourceNodeFlowAndFlowKey() (*flowpb.Flow, *FlowKey) {
 		K8S: &flowpb.Kubernetes{
 			FlowType:                   flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL,
 			DestinationServicePortName: "service-name",
+			DestinationServiceIp:       []byte{0x0e, 0xec, 0x01, 0x03},
 		},
 		Ip: sourceNodeIP,
 		Transport: &flowpb.Transport{
@@ -526,9 +527,13 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		got := item.flowKey
 		assert.Equal(t, flowKey, got, "Expected flow to be correlated and added to queue")
 
-		_, exists = ap.flowKeyRecordMap[*flowKey]
+		record, exists := ap.flowKeyRecordMap[*flowKey]
 		assert.True(t, exists, "Expected correlated flow to be added to flowKeyRecordMap")
 		assert.True(t, item.flowRecord.ReadyToSend, "Expected correlated flow to be marked ready to send for export")
+		correlatedFlow := record.Record
+		assert.NotNil(t, correlatedFlow, "Expected stored flow to not be nil")
+		assert.Equal(t, []byte{0xac, 0x12, 0x00, 0x01}, correlatedFlow.Ip.Source, "Expected correlated flow to have original source IP")
+		assert.Equal(t, []byte{0x0e, 0xec, 0x01, 0x03}, correlatedFlow.K8S.DestinationServiceIp, "Expected correlated flow to have node IP")
 
 		// Ensure cleanup
 		flow := ap.CorrelateExternal(destinationNodeRecord)
@@ -556,9 +561,14 @@ func TestCorrelateRecordsForFromExternalFlow(t *testing.T) {
 		got := item.flowKey
 		assert.Equal(t, flowKey, got, "Expected flow to be correlated and added to queue")
 
-		_, exists = ap.flowKeyRecordMap[*flowKey]
+		record, exists := ap.flowKeyRecordMap[*flowKey]
 		assert.True(t, exists, "Expected correlated flow to be added to flowKeyRecordMap")
 		assert.True(t, item.flowRecord.ReadyToSend, "Expected correlated flow to be marked ready to send for export")
+
+		correlatedFlow := record.Record
+		assert.NotNil(t, correlatedFlow, "Expected stored flow to not be nil")
+		assert.Equal(t, []byte{0xac, 0x12, 0x00, 0x01}, correlatedFlow.Ip.Source, "Expected correlated flow to have original source IP")
+		assert.Equal(t, []byte{0x0e, 0xec, 0x01, 0x03}, correlatedFlow.K8S.DestinationServiceIp, "Expected correlated flow to have node IP")
 
 		// Ensure cleanup
 		flow := ap.CorrelateExternal(sourceNodeRecord)
