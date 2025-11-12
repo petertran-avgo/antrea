@@ -118,29 +118,30 @@ message Kubernetes {
   string destination_node_uid = 13;
 
   bytes destination_cluster_ip = 14;
-  uint32 destination_service_port = 15;
-  string destination_service_port_name = 16;
-  string destination_service_uid = 17;
+  bytes destination_service_ip = 15;
+  uint32 destination_service_port = 16;
+  string destination_service_port_name = 17;
+  string destination_service_uid = 18;
 
-  NetworkPolicyType ingress_network_policy_type = 18;
-  string ingress_network_policy_namespace = 19;
-  string ingress_network_policy_name = 20;
-  string ingress_network_policy_uid = 21;
-  string ingress_network_policy_rule_name = 22;
-  NetworkPolicyRuleAction ingress_network_policy_rule_action = 23;
+  NetworkPolicyType ingress_network_policy_type = 19;
+  string ingress_network_policy_namespace = 20;
+  string ingress_network_policy_name = 21;
+  string ingress_network_policy_uid = 22;
+  string ingress_network_policy_rule_name = 23;
+  NetworkPolicyRuleAction ingress_network_policy_rule_action = 24;
 
-  NetworkPolicyType egress_network_policy_type = 24;
-  string egress_network_policy_namespace = 25;
-  string egress_network_policy_name = 26;
-  string egress_network_policy_uid = 27;
-  string egress_network_policy_rule_name = 28;
-  NetworkPolicyRuleAction egress_network_policy_rule_action = 29;
+  NetworkPolicyType egress_network_policy_type = 25;
+  string egress_network_policy_namespace = 26;
+  string egress_network_policy_name = 27;
+  string egress_network_policy_uid = 28;
+  string egress_network_policy_rule_name = 29;
+  NetworkPolicyRuleAction egress_network_policy_rule_action = 30;
 
-  string egress_name = 30;
-  bytes egress_ip = 31;
-  string egress_node_name = 32;
-  string egress_node_uid = 33;
-  string egress_uid = 34;
+  string egress_name = 31;
+  bytes egress_ip = 32;
+  string egress_node_name = 33;
+  string egress_node_uid = 34;
+  string egress_uid = 35;
 }
 
 message App {
