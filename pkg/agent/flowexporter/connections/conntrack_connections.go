@@ -440,6 +440,7 @@ func CorrelateExternal(zoneZero, antreaZone *connection.Connection) {
 	antreaZone.FlowKey.SourceAddress = zoneZero.FlowKey.SourceAddress
 	antreaZone.ProxySnatIP = zoneZero.ProxySnatIP
 	antreaZone.ProxySnatPort = zoneZero.ProxySnatPort
+	antreaZone.OriginalDestinationAddress = zoneZero.OriginalDestinationAddress
 }
 
 // Given a connection key, delete it from the cache. Log an error
