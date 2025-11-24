@@ -27,9 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clocktesting "k8s.io/utils/clock/testing"
 
+	corev1 "k8s.io/api/core/v1"
+
 	flowpb "antrea.io/antrea/pkg/apis/flow/v1alpha1"
 	"antrea.io/antrea/pkg/flowaggregator/flowrecord"
-	corev1 "k8s.io/api/core/v1"
 )
 
 func init() {

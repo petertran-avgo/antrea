@@ -25,8 +25,6 @@ type ItemToExpire struct {
 	flowRecord         *AggregationFlowRecord
 	activeExpireTime   time.Time
 	inactiveExpireTime time.Time
-	// identify if item has flow type FromExternal which is handled differently
-	isFromExternal bool // TODO backfill test for this
 	// Index in the priority queue (heap)
 	index int
 }

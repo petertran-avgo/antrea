@@ -33,6 +33,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
+	listers "k8s.io/client-go/listers/core/v1"
+
 	flowpb "antrea.io/antrea/pkg/apis/flow/v1alpha1"
 	flowaggregatorconfig "antrea.io/antrea/pkg/config/flowaggregator"
 	"antrea.io/antrea/pkg/flowaggregator/collector"
@@ -42,7 +44,6 @@ import (
 	"antrea.io/antrea/pkg/flowaggregator/querier"
 	"antrea.io/antrea/pkg/ipfix"
 	"antrea.io/antrea/pkg/util/objectstore"
-	listers "k8s.io/client-go/listers/core/v1"
 )
 
 const aggregationWorkerNum = 2

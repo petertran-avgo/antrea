@@ -16,7 +16,6 @@ package flowexporter
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/netip"
 	"strings"
@@ -318,8 +317,8 @@ func runSendFlowRecordTests(t *testing.T, flowExp *FlowExporter, isIPv6 bool) {
 				conn.OriginalPackets = tt.originalPackets
 				conn.ReversePackets = tt.reversePackets
 				flowExp.conntrackConnStore.AddOrUpdateConn(conn)
-				assert.Equalf(t, getNumOfConntrackConns(flowExp.conntrackConnStore), 1, "connection is expected to be in the connection map")
-				assert.Equalf(t, flowExp.conntrackPriorityQueue.Len(), 1, "pqItem is expected to be in the expire priority queue")
+				require.Equalf(t, getNumOfConntrackConns(flowExp.conntrackConnStore), 1, "connection is expected to be in the connection map")
+				require.Equalf(t, flowExp.conntrackPriorityQueue.Len(), 1, "pqItem is expected to be in the expire priority queue")
 				conn.PrevPackets = tt.prevPackets
 				conn.PrevReversePackets = tt.prevReversePackets
 				pqItem = flowExp.conntrackPriorityQueue.KeyToItem[connKey]
@@ -425,16 +424,6 @@ func (m mockServiceLookUp) FillServiceInfo(conn *connection.Connection) error {
 	return nil
 }
 
-type mockServiceLookUpErrors struct{}
-
-func (m mockServiceLookUpErrors) IsNil() bool {
-	return false
-}
-
-func (m mockServiceLookUpErrors) FillServiceInfo(conn *connection.Connection) error {
-	return errors.New("error")
-}
-
 func TestFlowExporter_findFlowType(t *testing.T) {
 	conn1 := connection.Connection{SourcePodName: "podA", DestinationPodName: "podB"}
 	conn2 := connection.Connection{SourcePodName: "podA", DestinationPodName: ""}
@@ -449,7 +438,6 @@ func TestFlowExporter_findFlowType(t *testing.T) {
 	conn11 := connection.Connection{FlowKey: connection.Tuple{SourceAddress: isNotPod, DestinationAddress: isNotPod}}
 	mockController := mockNodeRouteController{}
 	mockServiceLookUp := mockServiceLookUp{}
-	//mockServiceLookUpErrors := mockServiceLookUpErrors{} TODO  - this is not tested
 	//var nilFlowExporter *FlowExporter = nil // todo - should this be used?
 	//var nilServiceLookUp serviceLookUpInterface = nilFlowExporter // TODO this is not tested
 	for _, tc := range []struct {

@@ -29,9 +29,10 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 
+	listers "k8s.io/client-go/listers/core/v1"
+
 	flowpb "antrea.io/antrea/pkg/apis/flow/v1alpha1"
 	"antrea.io/antrea/pkg/flowaggregator/flowrecord"
-	listers "k8s.io/client-go/listers/core/v1"
 )
 
 var (
@@ -345,26 +346,6 @@ func (a *aggregationProcess) AreExternalFieldsFilled(record AggregationFlowRecor
 
 func (a *aggregationProcess) IsAggregatedRecordIPv4(record AggregationFlowRecord) bool {
 	return record.isIPv4
-}
-
-// isSourceInternal turns true if the source IP address is on the
-// internal network for either IPv4 or IPv6 addresses
-func isSourceInternal(record *flowpb.Flow) bool {
-	ip := net.ParseIP(flowrecord.IpAddressAsString(record.Ip.Source))
-	if ip == nil {
-		return false
-	}
-
-	if ip4 := ip.To4(); ip4 != nil {
-		if ip4[0] == 10 {
-			return true
-		}
-	}
-
-	if ip6 := ip.To16(); ip6 != nil {
-		return ip6[0] == 0xfd
-	}
-	return false
 }
 
 // addOrUpdateRecordInMap either adds the record to flowKeyMap or updates the record in

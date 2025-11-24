@@ -327,7 +327,6 @@ func (exp *FlowExporter) IsNil() bool {
 }
 
 func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteController nodeRouteControllerInterface, serviceLookUp serviceLookUpInterface) uint8 {
-	klog.InfoS("qq finding flow for", "conn", conn)
 	// TODO: support Pod-To-External flows in network policy only mode.
 	if exp.isNetworkPolicyOnly {
 		klog.InfoS("network policy is on", "conn", conn)
@@ -349,7 +348,6 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteContr
 	if dstIsGw {
 		// This matches what we do in filterAntreaConns but is more general as we consider
 		// remote gateways as well.
-		klog.InfoS("flow is unsupported because dst is gateway", "srcIsGw", srcIsGw, "dstIsGw", dstIsGw, "conn", conn)
 		klog.V(5).InfoS("Flows where the destination IP is a gateway IP will not be exported")
 		return utils.FlowTypeUnsupported
 	}
@@ -369,10 +367,8 @@ func (exp *FlowExporter) findFlowType(conn connection.Connection, nodeRouteContr
 				return utils.FlowTypeUnspecified
 			}
 			if err := serviceLookUp.FillServiceInfo(&conn); err == nil {
-				klog.InfoS("fill service info successful", "conn", conn)
 				return utils.FlowTypeFromExternal
 			}
-			klog.InfoS("qq could not fill service info for", "conn", conn)
 		}
 		return utils.FlowTypeUnsupported
 	}
@@ -421,18 +417,30 @@ func getServiceName(port uint16, services []*corev1.Service) (string, string) {
 // the service whos port matches the destination port. An error is returned and error
 // messages are logged if no match is found or errors occurred retrieving services
 func (exp *FlowExporter) FillServiceInfo(conn *connection.Connection) error {
-	if conn.DestinationPodNamespace == "" {
-		klog.InfoS("Filling service info for connection, destination pod namespace empty", "connection", conn)
+	if exp.serviceInformer == nil {
+		errorMessage := errors.New("ServiceInformer is nil: Failed to list services")
+		klog.ErrorS(errorMessage, "Failed to find service info for connection", "connection", conn)
+		return errorMessage
 	}
-
-	//TODO error check along the way
-	services, err := exp.serviceInformer.Lister().Services(conn.DestinationPodNamespace).List(labels.NewSelector())
-	klog.InfoS("Filling service info for connection", "connection", conn, "services", services)
+	serviceLister := exp.serviceInformer.Lister()
+	if serviceLister == nil {
+		errorMessage := errors.New("ServiceLister is nil: Failed to list services")
+		klog.ErrorS(errorMessage, "Failed to find service info for connection", "connection", conn)
+		return errorMessage
+	}
+	serviceNamespaceLister := serviceLister.Services(conn.DestinationPodNamespace)
+	if serviceLister == nil {
+		errorMessage := errors.New("ServiceNamespaceLister is nil: Failed to list services")
+		klog.ErrorS(errorMessage, "Failed to find service info for connection", "connection", conn)
+		return errorMessage
+	}
+	services, err := serviceNamespaceLister.List(labels.NewSelector())
 	if err != nil {
 		errorMessage := fmt.Errorf("Failed to list services %w", err)
 		klog.ErrorS(errorMessage, "Failed to find service info for connection", "connection", conn)
 		return errorMessage
 	}
+
 	matchingServiceName, portName := getServiceName(conn.FlowKey.DestinationPort, services)
 	if matchingServiceName == "" {
 		errorMessage := errors.New("No service with matching port found")
