@@ -471,12 +471,12 @@ function run_test {
      timeout="100m"
   fi
 
-  go test -v -timeout=$timeout $RUN_OPT antrea.io/antrea/test/e2e -run=TestNew --flow-visibility -provider=kind --logs-export-dir=$ANTREA_LOG_DIR $np_evaluation_flag --skip-cases=$skiplist $coverage_args $EXTRA_ARGS
+  go test -v -timeout=$timeout $RUN_OPT antrea.io/antrea/test/e2e -run=TestNew --flow-visibility -provider=kind --logs-export-dir=$ANTREA_LOG_DIR $np_evaluation_flag --skip-cases=$skiplist $coverage_args $EXTRA_ARGS -deploy-antrea=false
   #go test -v -timeout=$timeout $RUN_OPT antrea.io/antrea/test/e2e $flow_visibility_args -provider=kind --logs-export-dir=$ANTREA_LOG_DIR $np_evaluation_flag --skip-cases=$skiplist $coverage_args $EXTRA_ARGS
 
   if $coverage; then
     pushd $ANTREA_COV_DIR
-    for dir in */; do 
+    for dir in */; do
       go tool covdata textfmt -i="${dir}" -o "${dir%?}_$(date +%Y-%m-%d_%H-%M-%S).cov.out"
       rm -rf "${dir}";
     done
