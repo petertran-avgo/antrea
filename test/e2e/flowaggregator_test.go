@@ -288,6 +288,23 @@ func TestFlowAggregatorSecureConnection(t *testing.T) {
 	}
 }
 
+func TestNew(t *testing.T) {
+	skipIfNotFlowVisibilityTest(t)
+	skipIfHasWindowsNodes(t)
+
+	var err error
+	data, _, _ := setupFlowAggregatorTest(t, flowVisibilityTestOptions{
+		databaseURL: defaultCHDatabaseURL,
+	})
+
+	k8sUtils, err = NewKubernetesUtils(data)
+	if err != nil {
+		t.Fatalf("Error when creating Kubernetes utils client: %v", err)
+	}
+
+	t.Run("testExternalToPodFlows", func(t *testing.T) { testExternalToPodFlows(t, data, false) }) //todo properly wire up v6 or v4
+}
+
 func TestFlowAggregator(t *testing.T) {
 	skipIfNotFlowVisibilityTest(t)
 	skipIfHasWindowsNodes(t)
