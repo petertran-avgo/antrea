@@ -393,6 +393,16 @@ func (e *ipfixExporter) addConnToSet(conn *connection.Connection) error {
 			ie.SetStringValue(conn.EgressIP)
 		case "egressNodeName":
 			ie.SetStringValue(conn.EgressNodeName)
+		case "destinationServiceIP":
+			if conn.DestinationServicePortName != "" {
+				ie.SetIPAddressValue(conn.OriginalDestinationAddress.AsSlice())
+			} else {
+				ie.SetIPAddressValue(net.IP{0, 0, 0, 0})
+			}
+		case "proxySnatIP":
+			ie.SetIPAddressValue(conn.ProxySnatIP.AsSlice())
+		case "proxySnatPort":
+			ie.SetUnsigned16Value(conn.ProxySnatPort)
 		}
 	}
 	err := e.ipfixSet.AddRecordV2(eL, templateID)
