@@ -20,6 +20,7 @@ WORKDIR /antrea
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,source=go.sum,target=go.sum \
     --mount=type=bind,source=go.mod,target=go.mod \
+    --mount=type=bind,source=go-ipfix,target=go-ipfix \
     go mod download
 
 COPY . /antrea
