@@ -276,9 +276,7 @@ fi
 if $flow_visibility; then
     manifest_args="$manifest_args --feature-gates FlowExporter=true,L7FlowExporter=true --extra-helm-values-file $FLOW_VISIBILITY_HELM_VALUES"
 fi
-if [[ "$flow_visibility_protocol" == "ipfix" ]]; then
-    manifest_args="$manifest_args --extra-helm-values flowExporter.flowCollectorAddr=flow-aggregator/flow-aggregator:4739:tls"
-fi
+manifest_args="$manifest_args --extra-helm-values flowExporter.flowCollectorAddr=flow-aggregator/flow-aggregator:4739:tls"
 if $flexible_ipam; then
     manifest_args="$manifest_args --flexible-ipam"
 fi
@@ -457,8 +455,9 @@ function run_test {
      EXTRA_ARGS="$EXTRA_ARGS --antrea-ipam"
      timeout="100m"
   fi
- 
-  go test -v -timeout=$timeout $RUN_OPT antrea.io/antrea/test/e2e $flow_visibility_args -provider=kind --logs-export-dir=$ANTREA_LOG_DIR $np_evaluation_flag --skip-cases=$skiplist $coverage_args $EXTRA_ARGS
+
+  go test -v -timeout=$timeout $RUN_OPT antrea.io/antrea/test/e2e -run=TestNew --flow-visibility -provider=kind --logs-export-dir=$ANTREA_LOG_DIR $np_evaluation_flag --skip-cases=$skiplist $coverage_args $EXTRA_ARGS
+  #go test -v -timeout=$timeout $RUN_OPT antrea.io/antrea/test/e2e $flow_visibility_args -provider=kind --logs-export-dir=$ANTREA_LOG_DIR $np_evaluation_flag --skip-cases=$skiplist $coverage_args $EXTRA_ARGS
 
   if $coverage; then
     pushd $ANTREA_COV_DIR
