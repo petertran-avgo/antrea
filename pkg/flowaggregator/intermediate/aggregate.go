@@ -21,6 +21,7 @@ import (
 	"net"
 	"net/netip"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -354,12 +355,23 @@ func (a *aggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record *fl
 	defer a.mutex.Unlock()
 
 	if a.FromExternalCorrelationRequired(record) {
+		found := strings.Contains(record.K8S.DestinationServicePortName, "node-port-service") ||
+			strings.Contains(net.IP(record.Ip.Source).String(), "172.18.0.1")
 		// Cache the record if not yet ready for correlation and return. Otherwise, pass through the correlated record
 		if a.CacheIfNew(record) {
+			if found {
+				klog.InfoS("qqq - before but returning", "record", record)
+			}
 			return
 		} else {
+			if found {
+				klog.InfoS("qqq - before", "record", record)
+			}
 			record = a.CorrelateExternal(record)
 			flowKey, _ = getFlowKeyFromRecord(record)
+			if found {
+				klog.InfoS("qqq - after", "record", record)
+			}
 		}
 	}
 
