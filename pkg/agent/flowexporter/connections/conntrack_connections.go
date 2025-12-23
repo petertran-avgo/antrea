@@ -198,10 +198,12 @@ func (cs *ConntrackConnectionStore) AddOrUpdateConn(conn *connection.Connection)
 
 	if conn.Zone == 0 {
 		cs.zoneZeroCache.Add(conn)
+		klog.InfoS("QQQQ Added connection to cache", "conn", conn)
 		return
 	}
 
 	if zoneZeroConn := cs.zoneZeroCache.GetMatching(conn); zoneZeroConn != nil {
+		klog.InfoS("QQQQ Found a matching zone zero entry", "zoneZero", zoneZeroConn, "conn", conn)
 		CorrelateExternal(zoneZeroConn, conn)
 	}
 
@@ -264,7 +266,7 @@ func (cs *ConntrackConnectionStore) AddOrUpdateConn(conn *connection.Connection)
 		// Add new antrea connection to connection store and PQ.
 		cs.connections[connKey] = conn
 		cs.expirePriorityQueue.WriteItemToQueue(connKey, conn)
-		klog.V(4).InfoS("New Antrea flow added", "connection", conn)
+		klog.V(4).InfoS("QQQQ New Antrea flow added", "connection", conn)
 	}
 }
 

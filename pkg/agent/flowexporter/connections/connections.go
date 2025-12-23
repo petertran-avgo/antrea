@@ -133,6 +133,8 @@ func (cs *connectionStore) fillPodInfo(conn *connection.Connection) {
 		conn.DestinationPodNamespace = dstPod.Namespace
 		conn.DestinationPodUID = string(dstPod.UID)
 	}
+
+	klog.InfoS("QQQQ Filling pod info", "srcFound", srcFound, "dstFound", dstFound, "conn", conn)
 }
 
 func (cs *connectionStore) fillServiceInfo(conn *connection.Connection, serviceStr string) {
