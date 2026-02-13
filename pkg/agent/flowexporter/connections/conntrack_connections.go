@@ -16,6 +16,7 @@ package connections
 
 import (
 	"fmt"
+	"net/netip"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -196,20 +197,36 @@ func (cs *ConntrackConnectionStore) Poll() ([]int, error) {
 func (cs *ConntrackConnectionStore) AddOrUpdateConn(conn *connection.Connection) {
 	conn.IsPresent = true
 
+	found := conn.FlowKey.DestinationAddress == netip.MustParseAddr("10.244.2.4") // 10.244.2.4
 	if conn.Zone == 0 {
+		found = conn.FlowKey.SourceAddress == netip.MustParseAddr("172.18.0.1") // 10.244.2.4
 		clusterIP := conn.OriginalDestinationAddress.String()
 		svcPort := conn.OriginalDestinationPort
 		protocol, _ := lookupServiceProtocol(conn.FlowKey.Protocol)
 		serviceStr := fmt.Sprintf("%s:%d/%s", clusterIP, svcPort, protocol)
+		if found {
+			klog.InfoS("q2q2 zone 0", "conn", conn, "serviceStr", serviceStr)
+		}
 		_, exists := cs.antreaProxier.GetServiceByIP(serviceStr)
 		if exists {
+			if found {
+				klog.InfoS("q2q2 zone 0 - got service", "conn", conn, "serviceStr", serviceStr)
+			}
 			cs.zoneZeroStore.add(conn)
 		}
 		return
 	}
 
+	found = conn.FlowKey.DestinationAddress == netip.MustParseAddr("10.244.2.4") // 10.244.2.4
+
 	if zoneZero := cs.zoneZeroStore.getMatching(conn); zoneZero != nil {
+		if found {
+			klog.InfoS("q2q2 before correlation", "conn", conn, "zonezero", zoneZero)
+		}
 		CorrelateExternal(zoneZero, conn)
+		if found {
+			klog.InfoS("q2q2 after correlation", "correalted conn", conn)
+		}
 	}
 
 	connKey := connection.NewConnectionKey(conn)
@@ -244,6 +261,10 @@ func (cs *ConntrackConnectionStore) AddOrUpdateConn(conn *connection.Connection)
 		klog.V(4).InfoS("Antrea flow updated", "connection", existingConn)
 	} else {
 		cs.fillPodInfo(conn)
+
+		if found {
+			klog.InfoS("q1q1 before calling fill service", "conn", conn)
+		}
 		if conn.Mark&openflow.ServiceCTMark.GetRange().ToNXRange().ToUint32Mask() == openflow.ServiceCTMark.GetValue() || conn.Mark == 2 {
 			clusterIP := conn.OriginalDestinationAddress.String()
 			svcPort := conn.OriginalDestinationPort

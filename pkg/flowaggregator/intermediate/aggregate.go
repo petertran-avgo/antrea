@@ -341,11 +341,20 @@ func (a *aggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record *fl
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
+	found := flowKey.SourceAddress == "172.18.0.1" || flowKey.DestinationAddress == "10.244.2.4"
+	key := a.generateFromExternalStoreKey(record)
 	if a.FromExternalCorrelationRequired(record) {
 		// Store the record if not yet ready for correlation and return. Otherwise, pass through the correlated record
 		if a.StoreIfNew(record) {
+			if found {
+				klog.InfoS("q3q3 stored", "record", record, "key", key)
+			}
 			return
 		} else {
+			found = flowKey.DestinationAddress == "10.244.2.4"
+			if found {
+				klog.InfoS("q3q3 correlating", "flowkey", flowKey, "record", record, "key", key)
+			}
 			record = a.CorrelateExternal(record)
 			flowKey, _ = getFlowKeyFromRecord(record)
 		}
@@ -819,6 +828,10 @@ func (a *aggregationProcess) isGateway(ip []byte) bool {
 // and the destinationNode has the gatewayIP as the sourceAddress. If flow is invalid, false
 // is returned
 func (a *aggregationProcess) FromExternalCorrelationRequired(flow *flowpb.Flow) bool {
+	targetIP := net.ParseIP("172.18.0.1")
+
+	myIP := net.IP(flow.Ip.Source)
+	found := myIP.Equal(targetIP)
 	if flow.K8S == nil || flow.K8S.FlowType != flowpb.FlowType_FLOW_TYPE_FROM_EXTERNAL {
 		return false
 	}
@@ -828,10 +841,16 @@ func (a *aggregationProcess) FromExternalCorrelationRequired(flow *flowpb.Flow) 
 	}
 	// DestinationNode flows have source IP as the gateway
 	if a.isGateway(flow.Ip.Source) {
+		if found {
+			klog.InfoS("q3q3 -- is gateway", "flow", flow)
+		}
 		return true
 	}
 	// SourceNode flows do not have podName
 	if flow.K8S == nil || flow.K8S.DestinationPodName == "" {
+		if found {
+			klog.InfoS("q3q3 -- k8s or dest podname nil", "flow", flow)
+		}
 		return true
 	}
 	return false

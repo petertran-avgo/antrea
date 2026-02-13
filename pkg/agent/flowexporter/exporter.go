@@ -379,6 +379,12 @@ func (exp *FlowExporter) exportConn(conn *connection.Connection) error {
 		}
 	}
 
+	found := conn.FlowKey.DestinationAddress == netip.MustParseAddr("10.244.2.4") ||
+		conn.FlowKey.SourceAddress == netip.MustParseAddr("172.18.0.1") ||
+		conn.FlowKey.SourceAddress == netip.MustParseAddr("10.244.0.1")
+	if found {
+		klog.InfoS("q4q4 found", "conn", conn)
+	}
 	if err := exp.exporter.Export(conn); err != nil {
 		return err
 	}

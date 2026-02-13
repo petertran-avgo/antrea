@@ -350,7 +350,7 @@ if $extra_vlan; then
 fi
 
 if $flexible_ipam; then
-   vlan_args="$vlan_args --vlan-subnets 11=192.168.241.1/24 --vlan-subnets 12=192.168.242.1/24" 
+   vlan_args="$vlan_args --vlan-subnets 11=192.168.241.1/24 --vlan-subnets 12=192.168.242.1/24"
 fi
 
 function setup_cluster {

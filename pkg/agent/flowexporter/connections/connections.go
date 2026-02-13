@@ -18,6 +18,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -136,13 +137,27 @@ func (cs *connectionStore) fillPodInfo(conn *connection.Connection) {
 }
 
 func (cs *connectionStore) fillServiceInfo(conn *connection.Connection, serviceStr string) {
+	found := conn.FlowKey.SourceAddress == netip.MustParseAddr("172.18.0.1")
+	if found {
+		klog.InfoS("q1q1", "conn", conn, "serviceStr", serviceStr)
+	}
 	// resolve destination Service information
 	if cs.antreaProxier != nil {
 		servicePortName, exists := cs.antreaProxier.GetServiceByIP(serviceStr)
 		if exists {
 			conn.DestinationServicePortName = servicePortName.String()
+			if found {
+				klog.InfoS("q1q1 - yes fill service", "conn", conn)
+			}
 		} else {
+			if found {
+				klog.InfoS("q1q1 - no fill service", "conn", conn)
+			}
 			klog.InfoS("Could not retrieve the Service info from antrea-agent-proxier", "serviceStr", serviceStr)
+		}
+	} else {
+		if found {
+			klog.InfoS("q1q1 - did not fill service, proxier nil", "conn", conn)
 		}
 	}
 }

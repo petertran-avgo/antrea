@@ -82,6 +82,9 @@ func (c *zoneZeroStore) cleanup(ttl time.Duration) {
 func (c *zoneZeroStore) generateKey(conn *connection.Connection) string {
 	destinationAddress := conn.FlowKey.DestinationAddress.String()
 	replyDestinationPort := strconv.FormatUint(uint64(conn.ProxySnatPort), 10)
+	// HACK - if this work, this should be conditional on ProxyAll on - maybe unless I think of other issues
+	destinationAddress = conn.FlowKey.SourceAddress.String()
+	replyDestinationPort = strconv.FormatUint(uint64(conn.FlowKey.SourcePort), 10)
 	return fmt.Sprintf("%s-%s", destinationAddress, replyDestinationPort)
 }
 
@@ -101,7 +104,11 @@ func (c *zoneZeroStore) add(conn *connection.Connection) error {
 // Given an antrea zone connection, generate a key that will equal the corresponding zone zero connection.
 func (c *zoneZeroStore) generateKeyFromAntreaZone(conn *connection.Connection) string {
 	destinationAddress := conn.FlowKey.DestinationAddress.String()
+
 	zoneZeroReplyDestinationPort := strconv.FormatUint(uint64(conn.FlowKey.SourcePort), 10)
+
+	// HACK - if this work, this should be conditional on ProxyAll on - maybe unless I think of other issues
+	destinationAddress = conn.FlowKey.SourceAddress.String()
 	return fmt.Sprintf("%s-%s", destinationAddress, zoneZeroReplyDestinationPort)
 }
 
