@@ -131,7 +131,28 @@ func (nfct *netFilterConnTrack) DumpFlowsInCtZone(zoneFilter uint16) ([]*connect
 	return antreaConns, nil
 }
 
+// determineProxySNAT returns the SNAT IP and Port of the given flow.
+// If SNAT did not occur, nil and 0 are returned.
+func determineProxySNAT(conn *conntrack.Flow) (netip.Addr, uint16) {
+	found := conn.TupleOrig.IP.SourceAddress == netip.MustParseAddr("172.18.0.1") ||
+		conn.TupleOrig.IP.DestinationAddress == netip.MustParseAddr("10.244.2.4")
+	replyDestinationIP := conn.TupleReply.IP.DestinationAddress
+
+	if conn.TupleOrig.IP.SourceAddress != replyDestinationIP {
+		if found {
+			klog.InfoS("q3q3 keeping snat", "conn", conn)
+		}
+		return replyDestinationIP, conn.TupleReply.Proto.DestinationPort
+	}
+	if found {
+		klog.InfoS("q3q3 NOT keeping snat", "conn", conn)
+	}
+
+	return netip.Addr{}, 0
+
+}
 func NetlinkFlowToAntreaConnection(conn *conntrack.Flow) *connection.Connection {
+	proxySnatIP, proxySnatPort := determineProxySNAT(conn)
 	newConn := connection.Connection{
 		ID:         conn.ID,
 		Timeout:    conn.Timeout,
@@ -149,8 +170,8 @@ func NetlinkFlowToAntreaConnection(conn *conntrack.Flow) *connection.Connection 
 			SourcePort:         conn.TupleOrig.Proto.SourcePort,
 			DestinationPort:    conn.TupleReply.Proto.SourcePort,
 		},
-		ProxySnatIP:                conn.TupleReply.IP.DestinationAddress,
-		ProxySnatPort:              conn.TupleReply.Proto.DestinationPort,
+		ProxySnatIP:                proxySnatIP,
+		ProxySnatPort:              proxySnatPort,
 		OriginalDestinationAddress: conn.TupleOrig.IP.DestinationAddress,
 		OriginalDestinationPort:    conn.TupleOrig.Proto.DestinationPort,
 		OriginalPackets:            conn.CountersOrig.Packets,
