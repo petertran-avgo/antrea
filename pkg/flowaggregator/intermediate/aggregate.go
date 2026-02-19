@@ -858,28 +858,36 @@ func (a *aggregationProcess) FromExternalCorrelationRequired(flow *flowpb.Flow) 
 
 // Return a key unique to the pair of flows that make up a FromExternal flow
 func (a *aggregationProcess) generateFromExternalStoreKey(record *flowpb.Flow) string {
-	var gateway string
-	var SNATPort string
+	if record.ProxySnatIp != nil {
+		var gateway string
+		var SNATPort string
 
-	if a.isGateway(record.Ip.Source) {
-		// Is Destination Flow
-		gateway = flowrecord.IpAddressAsString(record.Ip.Source)
-		SNATPort = strconv.FormatUint(uint64(record.Transport.SourcePort), 10)
+		if a.isGateway(record.Ip.Source) {
+			// Is Destination Flow
+			gateway = flowrecord.IpAddressAsString(record.Ip.Source)
+			SNATPort = strconv.FormatUint(uint64(record.Transport.SourcePort), 10)
+		} else {
+			// Is SourceFlow
+			gateway = flowrecord.IpAddressAsString(record.ProxySnatIp)
+			SNATPort = strconv.FormatUint(uint64(record.ProxySnatPort), 10)
+		}
+
+		destinationAddress := flowrecord.IpAddressAsString(record.Ip.Destination)
+		destinationPort := strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
+
+		return fmt.Sprintf("%s-%s-%s-%s",
+			SNATPort,
+			gateway,
+			destinationAddress,
+			destinationPort,
+		)
 	} else {
-		// Is SourceFlow
-		gateway = flowrecord.IpAddressAsString(record.ProxySnatIp)
-		SNATPort = strconv.FormatUint(uint64(record.ProxySnatPort), 10)
+		destinationIP := flowrecord.IpAddressAsString(record.Ip.Destination)
+		sourcePort := record.Transport.SourcePort
+		protocol := record.Transport.ProtocolNumber
+		return fmt.Sprintf("%s-%d-%d", destinationIP, sourcePort, protocol)
 	}
 
-	destinationAddress := flowrecord.IpAddressAsString(record.Ip.Destination)
-	destinationPort := strconv.FormatUint(uint64(record.Transport.DestinationPort), 10)
-
-	return fmt.Sprintf("%s-%s-%s-%s",
-		SNATPort,
-		gateway,
-		destinationAddress,
-		destinationPort,
-	)
 }
 
 // If FromExternal flow is not yet in the store, add it and return true.
